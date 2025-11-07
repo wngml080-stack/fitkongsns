@@ -380,6 +380,7 @@ export default function PostModal({
                         width={32}
                         height={32}
                         className="w-8 h-8 rounded-full object-cover"
+                        unoptimized={profileImageUrl.includes("supabase.co/storage")}
                       />
                     )}
                   </Link>
@@ -410,6 +411,7 @@ export default function PostModal({
                           width={32}
                           height={32}
                           className="w-8 h-8 rounded-full object-cover flex-shrink-0"
+                          unoptimized={profileImageUrl.includes("supabase.co/storage")}
                         />
                       )}
                     </Link>

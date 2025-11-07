@@ -132,6 +132,10 @@ export default function PostGrid({ userId }: PostGridProps) {
               fill
               className="object-cover"
               sizes="(max-width: 768px) 33vw, 200px"
+              unoptimized={post.image_url?.includes("supabase.co/storage") || post.image_url?.includes("supabase.co/storage/v1/object/public")}
+              onError={() => {
+                console.error("[PostGrid] Image load error:", post.image_url);
+              }}
             />
             {/* Hover 오버레이 */}
             <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-6">

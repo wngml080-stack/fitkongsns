@@ -25,7 +25,7 @@ export default function Header() {
       {/* 로고 */}
       <Link
         href="/"
-        className="text-xl font-bold text-[var(--instagram-text-primary)] dark:text-[var(--foreground)]"
+        className="text-xl font-bold text-[var(--instagram-blue)] dark:text-[var(--instagram-purple)] text-3d hover:scale-105 transition-transform"
       >
         Moment
       </Link>
@@ -62,7 +62,7 @@ export default function Header() {
 
         <SignedOut>
           <SignInButton mode="modal">
-            <button className="text-sm font-semibold text-[var(--instagram-blue)] hover:opacity-70 transition-opacity">
+            <button className="button-3d text-sm font-semibold text-[var(--instagram-blue)] dark:text-[var(--instagram-purple)] hover:opacity-90 transition-opacity px-4 py-2 rounded-lg bg-gradient-to-r from-[var(--instagram-purple)] to-[var(--instagram-purple-light)] text-white">
               로그인
             </button>
           </SignInButton>

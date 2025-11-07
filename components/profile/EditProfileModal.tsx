@@ -284,6 +284,7 @@ export default function EditProfileModal({
                     fill
                     className="object-cover"
                     sizes="128px"
+                    unoptimized={true}
                   />
                 </div>
                 <div className="flex gap-2">

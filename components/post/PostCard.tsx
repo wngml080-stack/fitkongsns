@@ -410,20 +410,30 @@ export default function PostCard({ post, onDelete }: PostCardProps) {
 
   // 프로필 이미지 URL (Clerk 또는 기본 아바타)
   const profileImageUrl = post.user.image_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${post.user.clerk_id}`;
+  const isSvg = profileImageUrl.includes("dicebear") || profileImageUrl.endsWith(".svg");
 
   return (
-    <article className="bg-white dark:bg-[var(--card)] border-x-0 md:border-x border-t border-b border-[var(--instagram-border)] dark:border-[var(--border)] rounded-none md:rounded-sm mb-0 md:mb-4">
+    <article className="card-3d bg-white dark:bg-[var(--card)] border-x-0 md:border-x border-t border-b border-[var(--instagram-border)] dark:border-[var(--border)] rounded-none md:rounded-sm mb-0 md:mb-4">
       {/* 헤더 */}
       <header className="h-[60px] flex items-center justify-between px-4 border-b border-[var(--instagram-border)] dark:border-[var(--border)]">
         <div className="flex items-center gap-3">
           <Link href={`/profile/${post.user.clerk_id || post.user.id}`}>
-            <Image
-              src={profileImageUrl}
-              alt={post.user.name}
-              width={32}
-              height={32}
-              className="rounded-full object-cover"
-            />
+            {isSvg ? (
+              <img
+                src={profileImageUrl}
+                alt={post.user.name}
+                className="w-8 h-8 rounded-full object-cover"
+              />
+            ) : (
+              <Image
+                src={profileImageUrl}
+                alt={post.user.name}
+                width={32}
+                height={32}
+                className="rounded-full object-cover"
+                unoptimized={profileImageUrl.includes("supabase.co/storage")}
+              />
+            )}
           </Link>
           <div className="flex flex-col">
             <Link
@@ -472,7 +482,7 @@ export default function PostCard({ post, onDelete }: PostCardProps) {
       {/* 이미지 영역 */}
       <div
         ref={imageRef}
-        className="relative w-full aspect-square bg-gray-100 cursor-pointer select-none"
+        className="relative w-full aspect-square bg-gray-100 cursor-pointer select-none image-3d"
         onDoubleClick={handleDoubleTap}
         onClick={handleImageClick}
       >
@@ -510,10 +520,10 @@ export default function PostCard({ post, onDelete }: PostCardProps) {
               onClick={handleLikeToggle}
               disabled={isToggling}
               className={`
-                transition-all duration-150 ease-out
+                button-3d transition-all duration-150 ease-out
                 hover:scale-110 active:scale-95
                 ${isAnimating ? "animate-like-pulse" : ""}
-                ${isLiked ? "text-[var(--instagram-like)]" : "text-[var(--instagram-text-primary)] dark:text-[var(--foreground)]"}
+                ${isLiked ? "text-[var(--instagram-like)] glow-3d" : "text-[var(--instagram-text-primary)] dark:text-[var(--foreground)]"}
                 disabled:opacity-50 disabled:cursor-not-allowed
               `}
               aria-label={isLiked ? "좋아요 취소" : "좋아요"}

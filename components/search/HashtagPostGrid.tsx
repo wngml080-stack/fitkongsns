@@ -26,6 +26,7 @@ export default function HashtagPostGrid({ hashtag }: HashtagPostGridProps) {
   const [error, setError] = useState<string | null>(null);
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(false);
+  const [imageErrors, setImageErrors] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     if (!hashtag) {
@@ -36,34 +37,90 @@ export default function HashtagPostGrid({ hashtag }: HashtagPostGridProps) {
     fetchPosts(1, hashtag);
   }, [hashtag]);
 
-  const fetchPosts = async (targetPage: number, targetHashtag: string) => {
+  const fetchPosts = async (targetPage: number, targetHashtag: string, retryCount = 0) => {
+    const MAX_RETRIES = 2;
+    const RETRY_DELAY = 1000; // 1초
+
     try {
       setLoading(true);
       setError(null);
 
-      const response = await fetch(
-        `/api/posts?hashtag=${encodeURIComponent(targetHashtag)}&page=${targetPage}&limit=12`
-      );
+      const url = `/api/posts?hashtag=${encodeURIComponent(targetHashtag)}&page=${targetPage}&limit=12`;
+      console.log("[HashtagPostGrid] Fetching posts:", { url, targetHashtag, targetPage, retryCount });
+
+      // 타임아웃 설정 (10초)
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 10000);
+
+      const response = await fetch(url, {
+        signal: controller.signal,
+      });
+
+      clearTimeout(timeoutId);
+
+      console.log("[HashtagPostGrid] Response status:", response.status, response.statusText);
 
       if (!response.ok) {
-        const errorMessage = await extractErrorMessage(response);
+        const errorData = await response.json().catch(() => ({}));
+        console.error("[HashtagPostGrid] API Error:", {
+          status: response.status,
+          statusText: response.statusText,
+          error: errorData,
+        });
+        const errorMessage = errorData.error || await extractErrorMessage(response);
         throw new Error(errorMessage);
       }
 
       const data = await response.json();
+      console.log("[HashtagPostGrid] Received data:", {
+        postsCount: data.posts?.length || 0,
+        hasMore: data.hasMore,
+        page: data.page,
+      });
 
       if (targetPage === 1) {
-        setPosts(data.posts);
+        setPosts(data.posts || []);
+        setImageErrors(new Set()); // 새 페이지 로드 시 이미지 에러 상태 초기화
       } else {
-        setPosts((prev) => [...prev, ...data.posts]);
+        setPosts((prev) => [...prev, ...(data.posts || [])]);
       }
 
-      setHasMore(data.hasMore);
+      setHasMore(data.hasMore || false);
       setPage(data.page || targetPage);
     } catch (err) {
+      // 타임아웃 에러 처리
+      if (err instanceof Error && err.name === "AbortError") {
+        const timeoutError = new Error("요청 시간이 초과되었습니다. 다시 시도해주세요.");
+        if (retryCount < MAX_RETRIES) {
+          console.log(`[HashtagPostGrid] Timeout, retrying... (${retryCount + 1}/${MAX_RETRIES})`);
+          await new Promise((resolve) => setTimeout(resolve, RETRY_DELAY * (retryCount + 1)));
+          return fetchPosts(targetPage, targetHashtag, retryCount + 1);
+        }
+        setError(getUserFriendlyErrorMessage(timeoutError));
+        return;
+      }
+
+      // 네트워크 에러이고 재시도 횟수가 남아있으면 재시도
+      if (
+        (err instanceof TypeError && err.message.includes("fetch")) ||
+        (err instanceof Error && err.message.includes("Failed to fetch")) ||
+        (err instanceof Error && err.message.includes("network"))
+      ) {
+        if (retryCount < MAX_RETRIES) {
+          console.log(`[HashtagPostGrid] Network error, retrying... (${retryCount + 1}/${MAX_RETRIES})`);
+          await new Promise((resolve) => setTimeout(resolve, RETRY_DELAY * (retryCount + 1)));
+          return fetchPosts(targetPage, targetHashtag, retryCount + 1);
+        }
+      }
+
       const errorMessage = getUserFriendlyErrorMessage(err);
       setError(errorMessage);
-      console.error("Error fetching hashtag posts:", err);
+      console.error("[HashtagPostGrid] Error fetching hashtag posts:", {
+        error: err,
+        hashtag: targetHashtag,
+        page: targetPage,
+        retryCount,
+      });
     } finally {
       setLoading(false);
     }
@@ -118,13 +175,27 @@ export default function HashtagPostGrid({ hashtag }: HashtagPostGridProps) {
             href={`/post/${post.id}`}
             className="group relative aspect-square bg-gray-100 dark:bg-gray-800 overflow-hidden"
           >
-            <Image
-              src={post.image_url}
-              alt={post.caption || "게시물"}
-              fill
-              className="object-cover"
-              sizes="(max-width: 768px) 33vw, 200px"
-            />
+            {imageErrors.has(post.id) ? (
+              <div className="w-full h-full flex items-center justify-center bg-gray-200 dark:bg-gray-700">
+                <span className="text-gray-400 text-sm">이미지를 불러올 수 없습니다</span>
+              </div>
+            ) : (
+              <Image
+                src={post.image_url}
+                alt={post.caption || "게시물"}
+                fill
+                className="object-cover"
+                sizes="(max-width: 768px) 33vw, 200px"
+                unoptimized={post.image_url?.includes("supabase.co/storage") || post.image_url?.includes("supabase.co/storage/v1/object/public")}
+                onError={() => {
+                  console.error("[HashtagPostGrid] Image load error:", {
+                    imageUrl: post.image_url,
+                    postId: post.id,
+                  });
+                  setImageErrors((prev) => new Set(prev).add(post.id));
+                }}
+              />
+            )}
             <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-6">
               <div className="flex items-center gap-2 text-white">
                 <Heart className="w-5 h-5 fill-current" />

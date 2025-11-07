@@ -43,6 +43,7 @@ function extractHashtags(text: string | null | undefined): string[] {
 
 export async function GET(request: NextRequest) {
   try {
+    console.log("[GET /api/posts] Request received");
     const searchParams = request.nextUrl.searchParams;
     const page = parseInt(searchParams.get("page") || String(DEFAULT_PAGE), 10);
     const limit = parseInt(searchParams.get("limit") || String(DEFAULT_LIMIT), 10);
@@ -101,66 +102,158 @@ export async function GET(request: NextRequest) {
     let totalCount: number | null = null;
 
     if (normalizedHashtag) {
-      const { data: hashtagRecord, error: hashtagError } = await supabase
-        .from("hashtags")
-        .select("id")
-        .eq("tag", normalizedHashtag)
-        .single();
+      try {
+        console.log("[GET /api/posts] Searching for hashtag:", normalizedHashtag);
+        
+        // 해시태그 조회 (에러 처리 개선)
+        const { data: hashtagRecord, error: hashtagError } = await supabase
+          .from("hashtags")
+          .select("id")
+          .eq("tag", normalizedHashtag)
+          .maybeSingle(); // single() 대신 maybeSingle() 사용 (에러 대신 null 반환)
 
-      if (hashtagError && hashtagError.code !== "PGRST116") {
-        console.error("Error fetching hashtag:", hashtagError);
+        if (hashtagError) {
+          console.error("[GET /api/posts] Error fetching hashtag:", {
+            error: hashtagError,
+            code: hashtagError.code,
+            message: hashtagError.message,
+            details: hashtagError.details,
+            hint: hashtagError.hint,
+            hashtag: normalizedHashtag,
+          });
+          return NextResponse.json(
+            { 
+              error: "해시태그 정보를 불러오는데 실패했습니다.",
+              details: process.env.NODE_ENV === "development" ? hashtagError.message : undefined
+            },
+            { status: 500 }
+          );
+        }
+
+        if (!hashtagRecord || !hashtagRecord.id) {
+          console.log("[GET /api/posts] Hashtag not found:", normalizedHashtag);
+          return NextResponse.json({ posts: [], hasMore: false, page });
+        }
+
+        console.log("[GET /api/posts] Found hashtag:", hashtagRecord.id);
+
+        // post_hashtags에서 post_id 조회
+        const { data: hashtagPosts, error: hashtagPostsError } = await supabase
+          .from("post_hashtags")
+          .select("post_id")
+          .eq("hashtag_id", hashtagRecord.id);
+
+        if (hashtagPostsError) {
+          console.error("[GET /api/posts] Error fetching post_hashtags:", {
+            error: hashtagPostsError,
+            code: hashtagPostsError.code,
+            message: hashtagPostsError.message,
+          });
+          return NextResponse.json(
+            { error: "해시태그 게시물을 불러오는데 실패했습니다." },
+            { status: 500 }
+          );
+        }
+
+        const allPostIds = (hashtagPosts || []).map((row) => row.post_id).filter(Boolean);
+        totalCount = allPostIds.length;
+        
+        console.log("[GET /api/posts] Found", totalCount, "posts for hashtag");
+
+        if (allPostIds.length === 0) {
+          return NextResponse.json({ posts: [], hasMore: false, page });
+        }
+
+        // 페이지네이션
+        const pagedPostIds = allPostIds.slice(offset, offset + limit);
+        if (pagedPostIds.length === 0) {
+          return NextResponse.json({ posts: [], hasMore: offset + limit < totalCount, page });
+        }
+
+        // posts 테이블에서 직접 조회
+        const { data: hashtagPostsData, error: hashtagPostsDataError } = await supabase
+          .from("posts")
+          .select("id, user_id, image_url, caption, created_at")
+          .in("id", pagedPostIds)
+          .order("created_at", { ascending: false });
+
+        if (hashtagPostsDataError) {
+          console.error("[GET /api/posts] Error fetching posts:", {
+            error: hashtagPostsDataError,
+            code: hashtagPostsDataError.code,
+            message: hashtagPostsDataError.message,
+          });
+          return NextResponse.json(
+            { error: "게시물을 불러오는데 실패했습니다." },
+            { status: 500 }
+          );
+        }
+
+        if (!hashtagPostsData || hashtagPostsData.length === 0) {
+          postsData = [];
+        } else {
+          // 좋아요 수와 댓글 수 계산 (에러 처리 추가)
+          const postIds = hashtagPostsData.map((p) => p.id);
+          let likesResult: any = { data: [] };
+          let commentsResult: any = { data: [] };
+          
+          try {
+            const [likesResponse, commentsResponse] = await Promise.all([
+              supabase.from("likes").select("post_id").in("post_id", postIds),
+              supabase.from("comments").select("post_id").in("post_id", postIds),
+            ]);
+            
+            likesResult = likesResponse;
+            commentsResult = commentsResponse;
+            
+            // 에러가 발생해도 계속 진행 (좋아요/댓글 수는 0으로 처리)
+            if (likesResult.error) {
+              console.warn("[GET /api/posts] Error fetching likes count:", likesResult.error);
+              likesResult.data = [];
+            }
+            if (commentsResult.error) {
+              console.warn("[GET /api/posts] Error fetching comments count:", commentsResult.error);
+              commentsResult.data = [];
+            }
+          } catch (err) {
+            console.error("[GET /api/posts] Error calculating likes/comments:", err);
+            // 에러가 발생해도 게시물은 반환 (좋아요/댓글 수는 0으로 처리)
+            likesResult.data = [];
+            commentsResult.data = [];
+          }
+
+          const likesCountMap = new Map<string, number>();
+          const commentsCountMap = new Map<string, number>();
+
+          (likesResult.data || []).forEach((like: any) => {
+            likesCountMap.set(like.post_id, (likesCountMap.get(like.post_id) || 0) + 1);
+          });
+
+          (commentsResult.data || []).forEach((comment: any) => {
+            commentsCountMap.set(comment.post_id, (commentsCountMap.get(comment.post_id) || 0) + 1);
+          });
+
+          postsData = hashtagPostsData.map((post) => ({
+            post_id: post.id,
+            user_id: post.user_id,
+            image_url: post.image_url,
+            caption: post.caption,
+            created_at: post.created_at,
+            likes_count: likesCountMap.get(post.id) || 0,
+            comments_count: commentsCountMap.get(post.id) || 0,
+          }));
+        }
+      } catch (err) {
+        console.error("[GET /api/posts] Unexpected error:", {
+          error: err,
+          message: err instanceof Error ? err.message : String(err),
+          stack: err instanceof Error ? err.stack : undefined,
+        });
         return NextResponse.json(
-          { error: "해시태그 정보를 불러오는데 실패했습니다." },
+          { error: "해시태그 검색 중 오류가 발생했습니다." },
           { status: 500 }
         );
       }
-
-      if (!hashtagRecord) {
-        return NextResponse.json({ posts: [], hasMore: false, page });
-      }
-
-      const { data: hashtagPosts, error: hashtagPostsError } = await supabase
-        .from("post_hashtags")
-        .select("post_id, created_at")
-        .eq("hashtag_id", hashtagRecord.id)
-        .order("created_at", { ascending: false });
-
-      if (hashtagPostsError) {
-        console.error("Error fetching post hashtags:", hashtagPostsError);
-        return NextResponse.json(
-          { error: "해시태그 게시물을 불러오는데 실패했습니다." },
-          { status: 500 }
-        );
-      }
-
-      const allPostIds = (hashtagPosts || []).map((row) => row.post_id);
-      totalCount = allPostIds.length;
-
-      if (allPostIds.length === 0) {
-        return NextResponse.json({ posts: [], hasMore: false, page });
-      }
-
-      const pagedPostIds = allPostIds.slice(offset, offset + limit);
-
-      if (pagedPostIds.length === 0) {
-        return NextResponse.json({ posts: [], hasMore: offset + limit < totalCount, page });
-      }
-
-      const { data: hashtagPostsData, error: hashtagPostsDataError } = await supabase
-        .from("post_stats")
-        .select("*")
-        .in("post_id", pagedPostIds)
-        .order("created_at", { ascending: false });
-
-      if (hashtagPostsDataError) {
-        console.error("Error fetching posts for hashtag:", hashtagPostsDataError);
-        return NextResponse.json(
-          { error: "게시물을 불러오는데 실패했습니다." },
-          { status: 500 }
-        );
-      }
-
-      postsData = hashtagPostsData;
     }
 
     if (!postsData) {
@@ -521,9 +614,16 @@ export async function GET(request: NextRequest) {
       page,
     });
   } catch (error) {
-    console.error("Error in GET /api/posts:", error);
+    console.error("[GET /api/posts] Unexpected error:", {
+      error,
+      message: error instanceof Error ? error.message : String(error),
+      stack: error instanceof Error ? error.stack : undefined,
+    });
     return NextResponse.json(
-      { error: "서버 오류가 발생했습니다." },
+      { 
+        error: "서버 오류가 발생했습니다.",
+        details: error instanceof Error ? error.message : String(error)
+      },
       { status: 500 }
     );
   }

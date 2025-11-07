@@ -622,6 +622,7 @@ export default function CreatePostModal({
                   fill
                   className="object-contain"
                   sizes="(max-width: 768px) 100vw, 600px"
+                  unoptimized={true}
                 />
               </div>
               <div className="absolute top-2 right-2 flex gap-2">
@@ -816,7 +817,7 @@ export default function CreatePostModal({
               type="button"
               onClick={handleSubmit}
               disabled={!selectedFile || isUploading}
-              className="bg-[var(--instagram-blue)] hover:bg-[var(--instagram-blue)]/90 text-white"
+              className="button-3d purple-gradient text-white hover:opacity-90 shadow-lg"
             >
               {isUploading ? (
                 <>

@@ -51,7 +51,7 @@
   --card-foreground: oklch(0.145 0 0);
   --popover: oklch(1 0 0);
   --popover-foreground: oklch(0.145 0 0);
-  --primary: oklch(0.205 0 0);
+  --primary: oklch(0.55 0.25 300);
   --primary-foreground: oklch(0.985 0 0);
   --secondary: oklch(0.97 0 0);
   --secondary-foreground: oklch(0.205 0 0);
@@ -77,11 +77,14 @@
   --sidebar-border: oklch(0.922 0 0);
   --sidebar-ring: oklch(0.708 0 0);
 
-  /* Instagram 컬러 스키마 (라이트 모드) */
-  --instagram-blue: #0095f6;
-  --instagram-background: #fafafa;
+  /* 보라색 테마 컬러 스키마 (라이트 모드) */
+  --instagram-blue: #9333ea;
+  --instagram-purple: #a855f7;
+  --instagram-purple-dark: #7e22ce;
+  --instagram-purple-light: #c084fc;
+  --instagram-background: #faf5ff;
   --instagram-card-background: #ffffff;
-  --instagram-border: #dbdbdb;
+  --instagram-border: #e9d5ff;
   --instagram-text-primary: #262626;
   --instagram-text-secondary: #8e8e8e;
   --instagram-like: #ed4956;
@@ -95,8 +98,8 @@
   --card-foreground: oklch(0.985 0 0);
   --popover: oklch(0.205 0 0);
   --popover-foreground: oklch(0.985 0 0);
-  --primary: oklch(0.922 0 0);
-  --primary-foreground: oklch(0.205 0 0);
+  --primary: oklch(0.65 0.25 300);
+  --primary-foreground: oklch(0.985 0 0);
   --secondary: oklch(0.269 0 0);
   --secondary-foreground: oklch(0.985 0 0);
   --muted: oklch(0.269 0 0);
@@ -121,11 +124,14 @@
   --sidebar-border: oklch(1 0 0 / 10%);
   --sidebar-ring: oklch(0.556 0 0);
 
-  /* Instagram 컬러 스키마 (다크 모드) */
-  --instagram-blue: #0095f6;
-  --instagram-background: oklch(0.145 0 0);
-  --instagram-card-background: oklch(0.205 0 0);
-  --instagram-border: oklch(1 0 0 / 10%);
+  /* 보라색 테마 컬러 스키마 (다크 모드) */
+  --instagram-blue: #a855f7;
+  --instagram-purple: #c084fc;
+  --instagram-purple-dark: #9333ea;
+  --instagram-purple-light: #d8b4fe;
+  --instagram-background: oklch(0.12 0.05 300);
+  --instagram-card-background: oklch(0.18 0.06 300);
+  --instagram-border: oklch(0.25 0.08 300);
   --instagram-text-primary: oklch(0.985 0 0);
   --instagram-text-secondary: oklch(0.708 0 0);
   --instagram-like: #ed4956;
@@ -213,4 +219,112 @@
 .reactEasyCrop_Image {
   max-width: unset;
   max-height: unset;
+}
+
+/* 3D 효과 스타일 */
+.perspective-3d {
+  perspective: 1000px;
+}
+
+.transform-3d {
+  transform-style: preserve-3d;
+  transition: transform 0.3s ease;
+}
+
+.card-3d {
+  transform-style: preserve-3d;
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+
+.card-3d:hover {
+  transform: translateY(-8px) rotateX(2deg);
+  box-shadow: 0 20px 40px rgba(147, 51, 234, 0.2);
+}
+
+.image-3d {
+  transform-style: preserve-3d;
+  transition: transform 0.3s ease;
+}
+
+.image-3d:hover {
+  transform: scale(1.05) translateZ(20px);
+}
+
+.button-3d {
+  transform-style: preserve-3d;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+  position: relative;
+}
+
+.button-3d:active {
+  transform: translateY(2px) scale(0.98);
+}
+
+.button-3d:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 16px rgba(147, 51, 234, 0.3);
+}
+
+/* 3D 배경 효과 */
+@keyframes float {
+  0%, 100% {
+    transform: translateY(0px) rotate(0deg);
+  }
+  50% {
+    transform: translateY(-20px) rotate(5deg);
+  }
+}
+
+@keyframes glow {
+  0%, 100% {
+    opacity: 0.5;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.8;
+    transform: scale(1.1);
+  }
+}
+
+.floating-3d {
+  animation: float 6s ease-in-out infinite;
+}
+
+.glow-3d {
+  animation: glow 3s ease-in-out infinite;
+  filter: drop-shadow(0 0 20px rgba(168, 85, 247, 0.5));
+}
+
+/* 그라데이션 배경 */
+.purple-gradient {
+  background: linear-gradient(135deg, #9333ea 0%, #a855f7 50%, #c084fc 100%);
+}
+
+.purple-gradient-dark {
+  background: linear-gradient(135deg, #7e22ce 0%, #9333ea 50%, #a855f7 100%);
+}
+
+/* 3D 텍스트 효과 */
+.text-3d {
+  text-shadow: 
+    0 1px 0 rgba(168, 85, 247, 0.3),
+    0 2px 0 rgba(168, 85, 247, 0.2),
+    0 3px 0 rgba(168, 85, 247, 0.1),
+    0 4px 8px rgba(0, 0, 0, 0.1);
+}
+
+/* 스크롤 시 나타나는 3D 효과 */
+@keyframes slideIn3D {
+  from {
+    opacity: 0;
+    transform: translateY(50px) rotateX(-10deg);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) rotateX(0deg);
+  }
+}
+
+.animate-slide-in-3d {
+  animation: slideIn3D 0.6s ease-out;
 }

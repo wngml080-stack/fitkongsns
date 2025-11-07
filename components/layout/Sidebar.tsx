@@ -69,7 +69,7 @@ export default function Sidebar() {
         <div className="h-[60px] flex items-center px-4 md:px-3 lg:px-4 border-b border-[var(--instagram-border)] dark:border-[var(--border)]">
           <Link
             href="/"
-            className="text-xl font-bold text-[var(--instagram-text-primary)] dark:text-[var(--foreground)] whitespace-nowrap overflow-hidden"
+            className="text-xl font-bold text-[var(--instagram-blue)] dark:text-[var(--instagram-purple)] text-3d hover:scale-105 transition-transform whitespace-nowrap overflow-hidden"
           >
             <span className="md:hidden lg:inline">Moment</span>
             <span className="hidden md:inline lg:hidden">M</span>
@@ -90,10 +90,10 @@ export default function Sidebar() {
                   <SignInButton key={item.href} mode="modal">
                     <button
                       className={`
-                        flex items-center gap-4 px-3 py-2 rounded-lg transition-colors w-full text-left
+                        button-3d flex items-center gap-4 px-3 py-2 rounded-lg transition-colors w-full text-left
                         ${
                           active
-                            ? "font-semibold text-[var(--instagram-text-primary)] dark:text-[var(--foreground)]"
+                            ? "font-semibold text-[var(--instagram-blue)] dark:text-[var(--instagram-purple)]"
                             : "text-[var(--instagram-text-primary)] dark:text-[var(--foreground)] hover:bg-gray-50 dark:hover:bg-gray-800"
                         }
                       `}
@@ -116,10 +116,10 @@ export default function Sidebar() {
                   key={item.href}
                   onClick={() => setIsCreateModalOpen(true)}
                   className={`
-                    flex items-center gap-4 px-3 py-2 rounded-lg transition-colors w-full text-left
+                    button-3d flex items-center gap-4 px-3 py-2 rounded-lg transition-colors w-full text-left
                     ${
                       active
-                        ? "font-semibold text-[var(--instagram-text-primary)] dark:text-[var(--foreground)]"
+                        ? "font-semibold text-[var(--instagram-blue)] dark:text-[var(--instagram-purple)]"
                         : "text-[var(--instagram-text-primary)] dark:text-[var(--foreground)] hover:bg-gray-50 dark:hover:bg-gray-800"
                     }
                   `}
@@ -140,10 +140,10 @@ export default function Sidebar() {
                 <SignInButton key={item.href} mode="modal">
                   <button
                     className={`
-                      flex items-center gap-4 px-3 py-2 rounded-lg transition-colors w-full text-left
+                      button-3d flex items-center gap-4 px-3 py-2 rounded-lg transition-colors w-full text-left
                       ${
                         active
-                          ? "font-semibold text-[var(--instagram-text-primary)] dark:text-[var(--foreground)]"
+                          ? "font-semibold text-[var(--instagram-blue)] dark:text-[var(--instagram-purple)]"
                           : "text-[var(--instagram-text-primary)] dark:text-[var(--foreground)] hover:bg-gray-50 dark:hover:bg-gray-800"
                       }
                     `}
@@ -166,10 +166,10 @@ export default function Sidebar() {
                 key={item.href}
                 href={href}
                 className={`
-                  flex items-center gap-4 px-3 py-2 rounded-lg transition-colors
+                  button-3d flex items-center gap-4 px-3 py-2 rounded-lg transition-colors
                   ${
                     active
-                      ? "font-semibold text-[var(--instagram-text-primary)] dark:text-[var(--foreground)]"
+                      ? "font-semibold text-[var(--instagram-blue)] dark:text-[var(--instagram-purple)]"
                       : "text-[var(--instagram-text-primary)] dark:text-[var(--foreground)] hover:bg-gray-50 dark:hover:bg-gray-800"
                   }
                 `}
