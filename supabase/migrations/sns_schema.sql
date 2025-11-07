@@ -45,9 +45,9 @@ CREATE TABLE IF NOT EXISTS public.posts (
 -- 테이블 소유자 설정
 ALTER TABLE public.posts OWNER TO postgres;
 
--- 인덱스 생성
-CREATE INDEX idx_posts_user_id ON public.posts(user_id);
-CREATE INDEX idx_posts_created_at ON public.posts(created_at DESC);
+-- 인덱스 생성 (이미 존재하면 무시)
+CREATE INDEX IF NOT EXISTS idx_posts_user_id ON public.posts(user_id);
+CREATE INDEX IF NOT EXISTS idx_posts_created_at ON public.posts(created_at DESC);
 
 -- RLS 비활성화 (개발 단계)
 ALTER TABLE public.posts DISABLE ROW LEVEL SECURITY;
@@ -73,9 +73,9 @@ CREATE TABLE IF NOT EXISTS public.likes (
 -- 테이블 소유자 설정
 ALTER TABLE public.likes OWNER TO postgres;
 
--- 인덱스 생성
-CREATE INDEX idx_likes_post_id ON public.likes(post_id);
-CREATE INDEX idx_likes_user_id ON public.likes(user_id);
+-- 인덱스 생성 (이미 존재하면 무시)
+CREATE INDEX IF NOT EXISTS idx_likes_post_id ON public.likes(post_id);
+CREATE INDEX IF NOT EXISTS idx_likes_user_id ON public.likes(user_id);
 
 -- RLS 비활성화 (개발 단계)
 ALTER TABLE public.likes DISABLE ROW LEVEL SECURITY;
@@ -100,10 +100,10 @@ CREATE TABLE IF NOT EXISTS public.comments (
 -- 테이블 소유자 설정
 ALTER TABLE public.comments OWNER TO postgres;
 
--- 인덱스 생성
-CREATE INDEX idx_comments_post_id ON public.comments(post_id);
-CREATE INDEX idx_comments_user_id ON public.comments(user_id);
-CREATE INDEX idx_comments_created_at ON public.comments(created_at DESC);
+-- 인덱스 생성 (이미 존재하면 무시)
+CREATE INDEX IF NOT EXISTS idx_comments_post_id ON public.comments(post_id);
+CREATE INDEX IF NOT EXISTS idx_comments_user_id ON public.comments(user_id);
+CREATE INDEX IF NOT EXISTS idx_comments_created_at ON public.comments(created_at DESC);
 
 -- RLS 비활성화 (개발 단계)
 ALTER TABLE public.comments DISABLE ROW LEVEL SECURITY;
@@ -130,9 +130,9 @@ CREATE TABLE IF NOT EXISTS public.follows (
 -- 테이블 소유자 설정
 ALTER TABLE public.follows OWNER TO postgres;
 
--- 인덱스 생성
-CREATE INDEX idx_follows_follower_id ON public.follows(follower_id);
-CREATE INDEX idx_follows_following_id ON public.follows(following_id);
+-- 인덱스 생성 (이미 존재하면 무시)
+CREATE INDEX IF NOT EXISTS idx_follows_follower_id ON public.follows(follower_id);
+CREATE INDEX IF NOT EXISTS idx_follows_following_id ON public.follows(following_id);
 
 -- RLS 비활성화 (개발 단계)
 ALTER TABLE public.follows DISABLE ROW LEVEL SECURITY;
@@ -196,14 +196,16 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
--- posts 테이블에 트리거 적용
-CREATE TRIGGER set_updated_at
+-- posts 테이블에 트리거 적용 (이미 존재하면 삭제 후 재생성)
+DROP TRIGGER IF EXISTS set_updated_at_posts ON public.posts;
+CREATE TRIGGER set_updated_at_posts
     BEFORE UPDATE ON public.posts
     FOR EACH ROW
     EXECUTE FUNCTION public.handle_updated_at();
 
--- comments 테이블에 트리거 적용
-CREATE TRIGGER set_updated_at
+-- comments 테이블에 트리거 적용 (이미 존재하면 삭제 후 재생성)
+DROP TRIGGER IF EXISTS set_updated_at_comments ON public.comments;
+CREATE TRIGGER set_updated_at_comments
     BEFORE UPDATE ON public.comments
     FOR EACH ROW
     EXECUTE FUNCTION public.handle_updated_at();

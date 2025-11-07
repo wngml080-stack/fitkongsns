@@ -46,6 +46,7 @@ interface Post {
   comments_count: number;
   user: PostUser;
   comments: Comment[];
+  isLiked?: boolean; // 선택적: 초기 로드 시 좋아요 상태
 }
 
 interface PostsResponse {
