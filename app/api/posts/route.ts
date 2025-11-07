@@ -697,7 +697,7 @@ export async function POST(request: NextRequest) {
 
     // Clerk user_id로 Supabase users 테이블에서 user_id 조회
     console.log("[POST /api/posts] Looking up user for clerk_id:", userId);
-    const { data: userData, error: userError } = await supabase
+    let { data: userData, error: userError } = await supabase
       .from("users")
       .select("id")
       .eq("clerk_id", userId)
