@@ -31,34 +31,21 @@ export async function getCroppedImg(
     throw new Error("Canvas context를 가져올 수 없습니다.");
   }
 
-  const maxSize = Math.max(image.width, image.height);
-  const safeArea = 2 * ((maxSize / 2) * Math.sqrt(2));
-
-  // 회전을 고려한 캔버스 크기 설정
-  canvas.width = safeArea;
-  canvas.height = safeArea;
-
-  ctx.translate(safeArea / 2, safeArea / 2);
-  ctx.rotate((rotation * Math.PI) / 180);
-  ctx.translate(-safeArea / 2, -safeArea / 2);
-
-  // 이미지 그리기
-  ctx.drawImage(
-    image,
-    safeArea / 2 - image.width * 0.5,
-    safeArea / 2 - image.height * 0.5
-  );
-
-  const data = ctx.getImageData(0, 0, safeArea, safeArea);
-
-  // 크롭 영역 설정
+  // 크롭 영역 크기로 캔버스 설정
   canvas.width = pixelCrop.width;
   canvas.height = pixelCrop.height;
 
-  ctx.putImageData(
-    data,
-    Math.round(0 - safeArea / 2 + image.width * 0.5 - pixelCrop.x),
-    Math.round(0 - safeArea / 2 + image.height * 0.5 - pixelCrop.y)
+  // 이미지를 크롭 영역에 맞게 그리기
+  ctx.drawImage(
+    image,
+    pixelCrop.x,
+    pixelCrop.y,
+    pixelCrop.width,
+    pixelCrop.height,
+    0,
+    0,
+    pixelCrop.width,
+    pixelCrop.height
   );
 
   return new Promise((resolve, reject) => {

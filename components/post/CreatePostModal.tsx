@@ -1,21 +1,25 @@
 "use client";
 
-import { useState, useRef, useCallback } from "react";
+import { useState, useRef, useCallback, useEffect } from "react";
 import { useAuth } from "@clerk/nextjs";
+import { useTheme } from "@/components/providers/theme-provider";
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { Upload, X, Loader2, Check } from "lucide-react";
+import { Upload, X, Loader2, Check, Smile, Hash } from "lucide-react";
 import Image from "next/image";
 import { getUserFriendlyErrorMessage, extractErrorMessage } from "@/lib/utils/error-handler";
 import Cropper, { Area } from "react-easy-crop";
 import "react-easy-crop/react-easy-crop.css";
 import { getCroppedImg, blobToFile } from "@/lib/utils/image-crop";
+import EmojiPicker, { EmojiClickData } from "emoji-picker-react";
+import { getHashtagSuggestions } from "@/lib/utils/hashtag-suggestions";
 
 /**
  * @file CreatePostModal.tsx
@@ -23,8 +27,11 @@ import { getCroppedImg, blobToFile } from "@/lib/utils/image-crop";
  *
  * 주요 기능:
  * - 이미지 업로드 (드래그 앤 드롭 또는 클릭)
+ * - 이미지 크롭 (1:1 정사각형)
  * - 이미지 미리보기
- * - 캡션 입력 (최대 2,200자)
+ * - 게시물 피드글 입력 (최대 2,200자)
+ * - 해시태그 입력 및 추천 (# 입력 시)
+ * - 이모지 입력
  * - 게시 버튼으로 업로드
  * - 업로드 진행 상태 표시
  *
@@ -50,6 +57,8 @@ export default function CreatePostModal({
   onSuccess,
 }: CreatePostModalProps) {
   const { userId } = useAuth();
+  const { theme } = useTheme();
+  const [mounted, setMounted] = useState(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [originalFile, setOriginalFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
@@ -58,6 +67,7 @@ export default function CreatePostModal({
   const [isUploading, setIsUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
   const [isDragging, setIsDragging] = useState(false);
   
   // 크롭 관련 상태
@@ -65,6 +75,44 @@ export default function CreatePostModal({
   const [crop, setCrop] = useState({ x: 0, y: 0 });
   const [zoom, setZoom] = useState(1);
   const [croppedAreaPixels, setCroppedAreaPixels] = useState<Area | null>(null);
+  
+  // 이모지 피커 상태
+  const [showEmojiPicker, setShowEmojiPicker] = useState(false);
+  
+  // 해시태그 추천 상태
+  const [showHashtagSuggestions, setShowHashtagSuggestions] = useState(false);
+  const [hashtagQuery, setHashtagQuery] = useState("");
+  const [cursorPosition, setCursorPosition] = useState(0);
+  const hashtagSuggestionsRef = useRef<HTMLDivElement>(null);
+  const emojiPickerRef = useRef<HTMLDivElement>(null);
+
+  // 마운트 확인 (다크모드 감지용)
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  // 외부 클릭 시 해시태그 추천 및 이모지 피커 닫기
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (
+        hashtagSuggestionsRef.current &&
+        !hashtagSuggestionsRef.current.contains(event.target as Node)
+      ) {
+        setShowHashtagSuggestions(false);
+      }
+      if (
+        emojiPickerRef.current &&
+        !emojiPickerRef.current.contains(event.target as Node)
+      ) {
+        setShowEmojiPicker(false);
+      }
+    };
+
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, []);
 
   // 파일 선택 핸들러
   const handleFileSelect = useCallback((file: File) => {
@@ -163,6 +211,78 @@ export default function CreatePostModal({
     handleRemoveImage();
   };
 
+  // 이모지 선택 핸들러
+  const handleEmojiClick = (emojiData: EmojiClickData) => {
+    const emoji = emojiData.emoji;
+    const textarea = textareaRef.current;
+    if (textarea) {
+      const start = textarea.selectionStart;
+      const end = textarea.selectionEnd;
+      const newText = caption.substring(0, start) + emoji + caption.substring(end);
+      setCaption(newText);
+      
+      // 커서 위치 조정
+      setTimeout(() => {
+        textarea.focus();
+        textarea.setSelectionRange(start + emoji.length, start + emoji.length);
+      }, 0);
+    }
+    setShowEmojiPicker(false);
+  };
+
+  // 해시태그 입력 핸들러
+  const handleCaptionChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    const value = e.target.value;
+    setCaption(value);
+    
+    const cursorPos = e.target.selectionStart;
+    setCursorPosition(cursorPos);
+    
+    // # 입력 감지
+    const textBeforeCursor = value.substring(0, cursorPos);
+    const lastHashIndex = textBeforeCursor.lastIndexOf("#");
+    
+    if (lastHashIndex !== -1) {
+      const textAfterHash = textBeforeCursor.substring(lastHashIndex + 1);
+      // 공백이나 줄바꿈이 없으면 해시태그 입력 중
+      if (!textAfterHash.includes(" ") && !textAfterHash.includes("\n")) {
+        setHashtagQuery(textAfterHash);
+        setShowHashtagSuggestions(true);
+        return;
+      }
+    }
+    
+    setShowHashtagSuggestions(false);
+    setHashtagQuery("");
+  };
+
+  // 해시태그 선택 핸들러
+  const handleHashtagSelect = (hashtag: string) => {
+    const textarea = textareaRef.current;
+    if (textarea) {
+      const cursorPos = cursorPosition;
+      const textBeforeCursor = caption.substring(0, cursorPos);
+      const lastHashIndex = textBeforeCursor.lastIndexOf("#");
+      
+      if (lastHashIndex !== -1) {
+        const newText =
+          caption.substring(0, lastHashIndex) +
+          hashtag +
+          " " +
+          caption.substring(cursorPos);
+        setCaption(newText);
+        
+        setTimeout(() => {
+          textarea.focus();
+          const newCursorPos = lastHashIndex + hashtag.length + 1;
+          textarea.setSelectionRange(newCursorPos, newCursorPos);
+        }, 0);
+      }
+    }
+    setShowHashtagSuggestions(false);
+    setHashtagQuery("");
+  };
+
   // 이미지 제거
   const handleRemoveImage = () => {
     if (previewUrl) {
@@ -177,6 +297,8 @@ export default function CreatePostModal({
     setCroppedPreviewUrl(null);
     setError(null);
     setShowCrop(false);
+    setShowEmojiPicker(false);
+    setShowHashtagSuggestions(false);
     if (fileInputRef.current) {
       fileInputRef.current.value = "";
     }
@@ -234,6 +356,8 @@ export default function CreatePostModal({
       handleRemoveImage();
       setCaption("");
       setError(null);
+      setShowEmojiPicker(false);
+      setShowHashtagSuggestions(false);
     }
     onOpenChange(newOpen);
   };
@@ -243,6 +367,9 @@ export default function CreatePostModal({
       <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>새 게시물 만들기</DialogTitle>
+          <DialogDescription className="sr-only">
+            이미지를 업로드하고 게시물 피드글을 작성하세요
+          </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-4">
@@ -373,36 +500,117 @@ export default function CreatePostModal({
                     />
                   </svg>
                 </button>
-                <button
-                  type="button"
-                  onClick={handleRemoveImage}
+              <button
+                type="button"
+                onClick={handleRemoveImage}
                   className="bg-black/50 hover:bg-black/70 text-white rounded-full p-2 transition-colors"
-                  aria-label="이미지 제거"
-                >
-                  <X className="w-4 h-4" />
-                </button>
+                aria-label="이미지 제거"
+              >
+                <X className="w-4 h-4" />
+              </button>
               </div>
             </div>
           )}
 
-          {/* 캡션 입력 (크롭 모드가 아닐 때만 표시) */}
+          {/* 게시물 피드글 입력 (크롭 모드가 아닐 때만 표시) */}
           {!showCrop && (
-          <div className="space-y-2">
-            <label
-              htmlFor="caption"
-              className="text-sm font-medium text-[var(--instagram-text-primary)] dark:text-[var(--foreground)]"
-            >
-              캡션
-            </label>
-            <Textarea
-              id="caption"
-              placeholder="게시물에 대한 설명을 입력하세요..."
-              value={caption}
-              onChange={(e) => setCaption(e.target.value)}
-              maxLength={MAX_CAPTION_LENGTH}
-              rows={4}
-              className="resize-none"
-            />
+          <div className="space-y-2 relative">
+            <div className="flex items-center justify-between">
+              <label
+                htmlFor="caption"
+                className="text-sm font-medium text-[var(--instagram-text-primary)] dark:text-[var(--foreground)]"
+              >
+                게시물 피드글
+              </label>
+              <div className="flex items-center gap-2">
+                {/* 해시태그 버튼 */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    const textarea = textareaRef.current;
+                    if (textarea) {
+                      const start = textarea.selectionStart;
+                      const newText = caption.substring(0, start) + "#" + caption.substring(start);
+                      setCaption(newText);
+                      setTimeout(() => {
+                        textarea.focus();
+                        textarea.setSelectionRange(start + 1, start + 1);
+                      }, 0);
+                    }
+                  }}
+                  className="p-1.5 rounded-md hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+                  aria-label="해시태그 추가"
+                  title="해시태그 추가"
+                >
+                  <Hash className="w-4 h-4 text-[var(--instagram-text-secondary)] dark:text-[var(--muted-foreground)]" />
+                </button>
+                {/* 이모지 버튼 */}
+                <button
+                  type="button"
+                  onClick={() => setShowEmojiPicker(!showEmojiPicker)}
+                  className="p-1.5 rounded-md hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+                  aria-label="이모지 추가"
+                  title="이모지 추가"
+                >
+                  <Smile className="w-4 h-4 text-[var(--instagram-text-secondary)] dark:text-[var(--muted-foreground)]" />
+                </button>
+              </div>
+            </div>
+            <div className="relative">
+              <Textarea
+                ref={textareaRef}
+                id="caption"
+                placeholder="게시물에 대한 설명을 입력하세요... 해시태그는 #을 입력해보세요"
+                value={caption}
+                onChange={handleCaptionChange}
+                onSelect={(e) => {
+                  const target = e.target as HTMLTextAreaElement;
+                  setCursorPosition(target.selectionStart);
+                }}
+                maxLength={MAX_CAPTION_LENGTH}
+                rows={4}
+                className="resize-none pr-10"
+              />
+              
+              {/* 해시태그 추천 리스트 */}
+              {showHashtagSuggestions && (
+                <div
+                  ref={hashtagSuggestionsRef}
+                  className="absolute z-20 mt-1 w-full bg-white dark:bg-[var(--card)] border border-[var(--instagram-border)] dark:border-[var(--border)] rounded-md shadow-lg max-h-48 overflow-y-auto"
+                >
+                  {getHashtagSuggestions(hashtagQuery).length > 0 ? (
+                    getHashtagSuggestions(hashtagQuery).map((hashtag) => (
+                      <button
+                        key={hashtag}
+                        type="button"
+                        onClick={() => handleHashtagSelect(hashtag)}
+                        className="w-full text-left px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors text-sm text-[var(--instagram-text-primary)] dark:text-[var(--foreground)]"
+                      >
+                        {hashtag}
+                      </button>
+                    ))
+                  ) : (
+                    <div className="px-4 py-2 text-sm text-[var(--instagram-text-secondary)] dark:text-[var(--muted-foreground)]">
+                      추천 해시태그가 없습니다
+                    </div>
+                  )}
+                </div>
+              )}
+              
+              {/* 이모지 피커 */}
+              {showEmojiPicker && mounted && (
+                <div ref={emojiPickerRef} className="absolute z-20 mt-1 right-0">
+                  <EmojiPicker
+                    onEmojiClick={handleEmojiClick}
+                    autoFocusSearch={false}
+                    theme={theme === "dark" ? "dark" : "light"}
+                    width={350}
+                    height={400}
+                    previewConfig={{ showPreview: false }}
+                  />
+                </div>
+              )}
+            </div>
             <div className="text-right text-xs text-[var(--instagram-text-secondary)] dark:text-[var(--muted-foreground)]">
               {caption.length}/{MAX_CAPTION_LENGTH}
             </div>

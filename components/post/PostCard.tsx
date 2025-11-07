@@ -196,10 +196,10 @@ export default function PostCard({ post, onDelete }: PostCardProps) {
       if (!isLiked) {
         handleLikeToggle();
       }
-      setShowDoubleTapHeart(true);
-      setTimeout(() => {
-        setShowDoubleTapHeart(false);
-      }, 1000);
+        setShowDoubleTapHeart(true);
+        setTimeout(() => {
+          setShowDoubleTapHeart(false);
+        }, 1000);
       lastTapRef.current = 0;
     } else {
       lastTapRef.current = now;
@@ -412,12 +412,12 @@ export default function PostCard({ post, onDelete }: PostCardProps) {
         {isOwnPost ? (
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <button
-                className="text-[var(--instagram-text-primary)] dark:text-[var(--foreground)] hover:opacity-70"
-                aria-label="더보기 메뉴"
-              >
-                <MoreHorizontal className="w-5 h-5" />
-              </button>
+        <button
+          className="text-[var(--instagram-text-primary)] dark:text-[var(--foreground)] hover:opacity-70"
+          aria-label="더보기 메뉴"
+        >
+          <MoreHorizontal className="w-5 h-5" />
+        </button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
               <DropdownMenuItem
