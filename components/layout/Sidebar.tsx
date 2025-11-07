@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import { Home, Search, Plus, Heart, User } from "lucide-react";
 import { SignedIn, SignedOut, SignInButton, UserButton, useAuth } from "@clerk/nextjs";
 import { useUser } from "@clerk/nextjs";
+import ThemeToggle from "@/components/theme-toggle";
 
 /**
  * @file Sidebar.tsx
@@ -57,17 +58,17 @@ export default function Sidebar() {
   };
 
   return (
-    <aside className="hidden md:flex md:flex-col fixed left-0 top-0 h-screen bg-white border-r border-[var(--instagram-border)] z-40">
+    <aside className="hidden md:flex md:flex-col fixed left-0 top-0 h-screen bg-white dark:bg-[var(--card)] border-r border-[var(--instagram-border)] dark:border-[var(--border)] z-40">
       {/* Desktop: 244px 너비, Tablet: 72px 너비 */}
       <div className="w-[244px] md:w-[72px] lg:w-[244px] h-full flex flex-col">
         {/* 로고 영역 */}
-        <div className="h-[60px] flex items-center px-4 md:px-3 lg:px-4 border-b border-[var(--instagram-border)]">
+        <div className="h-[60px] flex items-center px-4 md:px-3 lg:px-4 border-b border-[var(--instagram-border)] dark:border-[var(--border)]">
           <Link
             href="/"
-            className="text-xl font-bold text-[var(--instagram-text-primary)] whitespace-nowrap overflow-hidden"
+            className="text-xl font-bold text-[var(--instagram-text-primary)] dark:text-[var(--foreground)] whitespace-nowrap overflow-hidden"
           >
-            <span className="md:hidden lg:inline">SNS</span>
-            <span className="hidden md:inline lg:hidden">S</span>
+            <span className="md:hidden lg:inline">Moment</span>
+            <span className="hidden md:inline lg:hidden">M</span>
           </Link>
         </div>
 
@@ -87,8 +88,8 @@ export default function Sidebar() {
                       flex items-center gap-4 px-3 py-2 rounded-lg transition-colors w-full text-left
                       ${
                         active
-                          ? "font-semibold text-[var(--instagram-text-primary)]"
-                          : "text-[var(--instagram-text-primary)] hover:bg-gray-50"
+                          ? "font-semibold text-[var(--instagram-text-primary)] dark:text-[var(--foreground)]"
+                          : "text-[var(--instagram-text-primary)] dark:text-[var(--foreground)] hover:bg-gray-50 dark:hover:bg-gray-800"
                       }
                     `}
                   >
@@ -113,8 +114,8 @@ export default function Sidebar() {
                   flex items-center gap-4 px-3 py-2 rounded-lg transition-colors
                   ${
                     active
-                      ? "font-semibold text-[var(--instagram-text-primary)]"
-                      : "text-[var(--instagram-text-primary)] hover:bg-gray-50"
+                      ? "font-semibold text-[var(--instagram-text-primary)] dark:text-[var(--foreground)]"
+                      : "text-[var(--instagram-text-primary)] dark:text-[var(--foreground)] hover:bg-gray-50 dark:hover:bg-gray-800"
                   }
                 `}
               >
@@ -130,7 +131,12 @@ export default function Sidebar() {
         </nav>
 
         {/* 프로필 영역 */}
-        <div className="px-3 py-4 border-t border-[var(--instagram-border)]">
+        <div className="px-3 py-4 border-t border-[var(--instagram-border)] dark:border-[var(--border)] space-y-2">
+          {/* 다크모드 토글 버튼 */}
+          <div className="px-3">
+            <ThemeToggle />
+          </div>
+
           <SignedIn>
             <div className="flex items-center gap-4 px-3 py-2">
               <UserButton
@@ -140,14 +146,14 @@ export default function Sidebar() {
                   },
                 }}
               />
-              <span className="md:hidden lg:inline text-base font-medium text-[var(--instagram-text-primary)]">
+              <span className="md:hidden lg:inline text-base font-medium text-[var(--instagram-text-primary)] dark:text-[var(--foreground)]">
                 프로필
               </span>
             </div>
           </SignedIn>
           <SignedOut>
             <SignInButton mode="modal">
-              <button className="flex items-center gap-4 px-3 py-2 w-full text-left text-[var(--instagram-text-primary)] hover:bg-gray-50 rounded-lg transition-colors">
+              <button className="flex items-center gap-4 px-3 py-2 w-full text-left text-[var(--instagram-text-primary)] dark:text-[var(--foreground)] hover:bg-gray-50 dark:hover:bg-gray-800 rounded-lg transition-colors">
                 <User className="w-6 h-6 stroke-2" />
                 <span className="md:hidden lg:inline text-base">로그인</span>
               </button>

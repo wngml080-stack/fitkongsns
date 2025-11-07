@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { Bell, MessageCircle } from "lucide-react";
 import { UserButton, SignedIn, SignedOut, SignInButton } from "@clerk/nextjs";
+import ThemeToggle from "@/components/theme-toggle";
 
 /**
  * @file Header.tsx
@@ -20,21 +21,22 @@ import { UserButton, SignedIn, SignedOut, SignInButton } from "@clerk/nextjs";
 
 export default function Header() {
   return (
-    <header className="md:hidden fixed top-0 left-0 right-0 h-[60px] bg-white border-b border-[var(--instagram-border)] z-50 flex items-center justify-between px-4">
+    <header className="md:hidden fixed top-0 left-0 right-0 h-[60px] bg-white dark:bg-[var(--card)] border-b border-[var(--instagram-border)] dark:border-[var(--border)] z-50 flex items-center justify-between px-4">
       {/* 로고 */}
       <Link
         href="/"
-        className="text-xl font-bold text-[var(--instagram-text-primary)]"
+        className="text-xl font-bold text-[var(--instagram-text-primary)] dark:text-[var(--foreground)]"
       >
-        SNS
+        Moment
       </Link>
 
       {/* 우측 아이콘들 */}
-      <div className="flex items-center gap-4">
+      <div className="flex items-center gap-3">
+        <ThemeToggle />
         <SignedIn>
           {/* 알림 아이콘 */}
           <button
-            className="text-[var(--instagram-text-primary)] hover:opacity-70 transition-opacity"
+            className="text-[var(--instagram-text-primary)] dark:text-[var(--foreground)] hover:opacity-70 transition-opacity"
             aria-label="알림"
           >
             <Bell className="w-6 h-6 stroke-2" />
@@ -42,7 +44,7 @@ export default function Header() {
 
           {/* DM 아이콘 */}
           <button
-            className="text-[var(--instagram-text-primary)] hover:opacity-70 transition-opacity"
+            className="text-[var(--instagram-text-primary)] dark:text-[var(--foreground)] hover:opacity-70 transition-opacity"
             aria-label="메시지"
           >
             <MessageCircle className="w-6 h-6 stroke-2" />

@@ -1,4 +1,4 @@
-# SNS 프로젝트 TODO 리스트
+# Moment 프로젝트 TODO 리스트
 
 ## 프로젝트 초기 세팅
 
@@ -76,16 +76,23 @@
   - [x] Tablet (72px 너비, 아이콘만)
   - [x] Mobile (숨김)
   - [x] Hover 효과 및 Active 상태 스타일
+  - [x] 로그인하지 않은 상태에서도 모든 메뉴 표시 (SignInButton으로 감싸기)
+  - [x] 다크모드 스타일 적용
+  - [x] 다크모드 토글 버튼 추가
 - [x] `components/layout/Header.tsx` 컴포넌트 (Mobile 전용)
   - [x] 높이 60px
   - [x] 로고 + 알림/DM/프로필 아이콘
+  - [x] 다크모드 스타일 적용
+  - [x] 다크모드 토글 버튼 추가
 - [x] `components/layout/BottomNav.tsx` 컴포넌트 (Mobile 전용)
   - [x] 높이 50px
   - [x] 5개 아이콘 (홈, 검색, 만들기, 좋아요, 프로필)
+  - [x] 로그인하지 않은 상태에서도 모든 메뉴 표시 (SignInButton으로 감싸기)
 - [x] `app/(main)/layout.tsx` Route Group 레이아웃
   - [x] Sidebar 통합
   - [x] Mobile Header/BottomNav 통합
   - [x] 반응형 레이아웃 적용
+  - [x] 다크모드 배경색 적용
 - [x] `app/layout.tsx`에서 기존 Navbar 제거 - OS
 - [x] `app/page.tsx`를 `app/(main)/page.tsx`로 이동 및 홈 피드 플레이스홀더 생성 - OS
 
@@ -259,6 +266,25 @@
   - [x] 상대 시간 포맷팅 함수 (`formatRelativeTime`)
   - [x] "3시간 전", "2일 전" 형식 지원
   - [x] PostCard에서 사용
+- [x] 다크모드 기능 구현
+  - [x] `components/providers/theme-provider.tsx` 테마 프로바이더 생성
+    - [x] 라이트/다크 모드 전환
+    - [x] localStorage에 설정 저장
+    - [x] 시스템 설정 자동 감지
+  - [x] `components/theme-toggle.tsx` 다크모드 토글 버튼 생성
+    - [x] 달/태양 아이콘으로 현재 모드 표시
+  - [x] `app/layout.tsx`에 ThemeProvider 통합
+  - [x] `app/globals.css`에 다크모드 CSS 변수 추가
+    - [x] 기본 다크모드 컬러 변수
+    - [x] Instagram 컬러 스키마 다크모드 버전
+  - [x] 레이아웃 컴포넌트에 다크모드 스타일 적용
+    - [x] Sidebar 다크모드 스타일 및 토글 버튼
+    - [x] Header 다크모드 스타일 및 토글 버튼
+    - [x] MainLayout 다크모드 배경색
+- [x] 앱 제목 변경: "SNS" → "Moment"
+  - [x] `app/layout.tsx` 메타데이터 제목 변경
+  - [x] `components/layout/Sidebar.tsx` 로고 변경 (Desktop: "Moment", Tablet: "M")
+  - [x] `components/layout/Header.tsx` 로고 변경
 
 ## 6. 1차 MVP 제외 기능 (2차 확장)
 

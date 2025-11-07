@@ -23,7 +23,7 @@ export default function MainLayout({
   children: React.ReactNode;
 }) {
   return (
-    <div className="min-h-screen bg-[var(--instagram-background)]">
+    <div className="min-h-screen bg-[var(--instagram-background)] dark:bg-[var(--background)]">
       {/* Sidebar - Desktop/Tablet 전용 */}
       <Sidebar />
 

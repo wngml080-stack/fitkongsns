@@ -4,6 +4,7 @@ import { koKR } from "@clerk/localizations";
 import { Geist, Geist_Mono } from "next/font/google";
 
 import { SyncUserProvider } from "@/components/providers/sync-user-provider";
+import { ThemeProvider } from "@/components/providers/theme-provider";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -17,7 +18,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "SNS",
+  title: "Moment",
   description: "Instagram 스타일 SNS 앱",
 };
 
@@ -28,11 +29,13 @@ export default function RootLayout({
 }>) {
   return (
     <ClerkProvider localization={koKR}>
-      <html lang="ko">
+      <html lang="ko" suppressHydrationWarning>
         <body
           className={`${geistSans.variable} ${geistMono.variable} antialiased`}
         >
-          <SyncUserProvider>{children}</SyncUserProvider>
+          <ThemeProvider>
+            <SyncUserProvider>{children}</SyncUserProvider>
+          </ThemeProvider>
         </body>
       </html>
     </ClerkProvider>
