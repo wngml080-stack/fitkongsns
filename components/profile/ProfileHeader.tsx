@@ -4,8 +4,10 @@ import Image from "next/image";
 import { useState, useEffect } from "react";
 import { useAuth, SignInButton } from "@clerk/nextjs";
 import { Button } from "@/components/ui/button";
-import { Loader2 } from "lucide-react";
+import { Loader2, Settings, Share2 } from "lucide-react";
 import { getUserFriendlyErrorMessage, extractErrorMessage } from "@/lib/utils/error-handler";
+import EditProfileModal from "./EditProfileModal";
+import { shareContent } from "@/lib/utils/share";
 
 /**
  * @file ProfileHeader.tsx
@@ -38,6 +40,8 @@ interface UserData {
   following_count: number;
   isFollowing: boolean;
   isOwnProfile: boolean;
+  bio: string | null;
+  website: string | null;
 }
 
 export default function ProfileHeader({ userId }: ProfileHeaderProps) {
@@ -49,6 +53,7 @@ export default function ProfileHeader({ userId }: ProfileHeaderProps) {
   const [followersCount, setFollowersCount] = useState(0);
   const [isToggling, setIsToggling] = useState(false);
   const [hoverUnfollow, setHoverUnfollow] = useState(false);
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
 
   useEffect(() => {
     fetchUserData();
@@ -168,6 +173,9 @@ export default function ProfileHeader({ userId }: ProfileHeaderProps) {
 
   // SVG 이미지는 unoptimized 옵션 사용
   const isSvg = profileImageUrl.includes("dicebear") || profileImageUrl.endsWith(".svg");
+  const displayWebsite = userData.website
+    ? userData.website.replace(/^https?:\/\//i, "")
+    : null;
 
   return (
     <div className="w-full py-8 px-4 border-b border-[var(--instagram-border)] dark:border-[var(--border)]">
@@ -200,7 +208,36 @@ export default function ProfileHeader({ userId }: ProfileHeaderProps) {
                 {userData.name}
               </h1>
               
-              {!userData.isOwnProfile && (
+              {userData.isOwnProfile ? (
+                <div className="flex gap-2">
+                  <Button
+                    onClick={() => setIsEditModalOpen(true)}
+                    variant="outline"
+                    className="font-semibold px-6"
+                  >
+                    <Settings className="w-4 h-4 mr-2" />
+                    프로필 편집
+                  </Button>
+                  <Button
+                    onClick={async () => {
+                      const profileUrl = `${window.location.origin}/profile/${userId}`;
+                      const result = await shareContent(
+                        profileUrl,
+                        `${userData.name}님의 프로필`,
+                        `${userData.name}님의 프로필을 확인해보세요`
+                      );
+                      if (result.success && result.method === "clipboard") {
+                        alert("프로필 링크가 클립보드에 복사되었습니다.");
+                      }
+                    }}
+                    variant="outline"
+                    className="font-semibold px-6"
+                  >
+                    <Share2 className="w-4 h-4 mr-2" />
+                    공유
+                  </Button>
+                </div>
+              ) : (
                 currentClerkId ? (
                   <Button
                     onClick={handleFollowToggle}
@@ -274,9 +311,45 @@ export default function ProfileHeader({ userId }: ProfileHeaderProps) {
                 </span>
               </button>
             </div>
+
+            {(userData.bio || userData.website) && (
+              <div className="space-y-1">
+                {userData.bio && (
+                  <p className="text-sm text-[var(--instagram-text-primary)] dark:text-[var(--foreground)] whitespace-pre-line">
+                    {userData.bio}
+                  </p>
+                )}
+                {userData.website && (
+                  <a
+                    href={userData.website}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-sm font-semibold text-[var(--instagram-blue)] hover:underline"
+                  >
+                    {displayWebsite}
+                  </a>
+                )}
+              </div>
+            )}
           </div>
         </div>
       </div>
+
+      {/* 프로필 편집 모달 */}
+      {userData && (
+        <EditProfileModal
+          open={isEditModalOpen}
+          onOpenChange={setIsEditModalOpen}
+          currentName={userData.name}
+          currentImageUrl={userData.image_url}
+          currentBio={userData.bio}
+          currentWebsite={userData.website}
+          onSuccess={() => {
+            // 프로필 정보 새로고침
+            fetchUserData();
+          }}
+        />
+      )}
     </div>
   );
 }

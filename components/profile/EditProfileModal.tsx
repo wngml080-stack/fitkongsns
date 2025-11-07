@@ -12,6 +12,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import { Loader2, Upload, X } from "lucide-react";
 import Image from "next/image";
 import { getUserFriendlyErrorMessage, extractErrorMessage } from "@/lib/utils/error-handler";
@@ -40,6 +41,8 @@ interface EditProfileModalProps {
   onOpenChange: (open: boolean) => void;
   currentName: string;
   currentImageUrl: string | null;
+  currentBio: string | null;
+  currentWebsite: string | null;
   onSuccess?: () => void;
 }
 
@@ -50,10 +53,14 @@ export default function EditProfileModal({
   onOpenChange,
   currentName,
   currentImageUrl,
+  currentBio,
+  currentWebsite,
   onSuccess,
 }: EditProfileModalProps) {
   const { userId } = useAuth();
   const [name, setName] = useState(currentName);
+  const [bio, setBio] = useState(currentBio || "");
+  const [website, setWebsite] = useState(currentWebsite || "");
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [originalFile, setOriginalFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
@@ -78,8 +85,10 @@ export default function EditProfileModal({
       setOriginalFile(null);
       setShowCrop(false);
       setError(null);
+      setBio(currentBio || "");
+      setWebsite(currentWebsite || "");
     }
-  }, [open, currentName, currentImageUrl]);
+  }, [open, currentName, currentImageUrl, currentBio, currentWebsite]);
 
   // 파일 선택 핸들러
   const handleFileSelect = useCallback((file: File) => {
@@ -144,6 +153,8 @@ export default function EditProfileModal({
       if (selectedFile) {
         formData.append("image", selectedFile);
       }
+      formData.append("bio", bio);
+      formData.append("website", website);
 
       const response = await fetch(`/api/users/${userId}`, {
         method: "PUT",
@@ -174,7 +185,7 @@ export default function EditProfileModal({
         <DialogHeader>
           <DialogTitle>프로필 편집</DialogTitle>
           <DialogDescription className="sr-only">
-            프로필 사진과 이름을 변경할 수 있습니다
+            프로필 사진과 이름, 소개글, 웹사이트를 변경할 수 있습니다
           </DialogDescription>
         </DialogHeader>
 
@@ -303,6 +314,37 @@ export default function EditProfileModal({
               maxLength={50}
               placeholder="이름을 입력하세요"
             />
+          </div>
+
+          {/* 소개글 입력 */}
+          <div className="space-y-2">
+            <Label htmlFor="bio">소개글</Label>
+            <Textarea
+              id="bio"
+              value={bio}
+              onChange={(e) => setBio(e.target.value)}
+              maxLength={150}
+              rows={4}
+              placeholder="간단한 소개글을 작성하세요 (최대 150자)"
+              className="resize-none"
+            />
+            <div className="text-right text-xs text-[var(--instagram-text-secondary)] dark:text-[var(--muted-foreground)]">
+              {bio.length}/150
+            </div>
+          </div>
+
+          {/* 웹사이트 입력 */}
+          <div className="space-y-2">
+            <Label htmlFor="website">웹사이트</Label>
+            <Input
+              id="website"
+              value={website}
+              onChange={(e) => setWebsite(e.target.value)}
+              placeholder="https://example.com"
+            />
+            <p className="text-xs text-[var(--instagram-text-secondary)] dark:text-[var(--muted-foreground)]">
+              웹사이트 주소는 "https://"를 포함해야 합니다. (없으면 자동으로 추가됩니다)
+            </p>
           </div>
 
           {/* 에러 메시지 */}

@@ -11,10 +11,13 @@ import { SignInButton } from "@clerk/nextjs";
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
+  DialogTitle,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import CommentForm from "@/components/comment/CommentForm";
 import { getUserFriendlyErrorMessage, extractErrorMessage } from "@/lib/utils/error-handler";
+import { shareContent } from "@/lib/utils/share";
 
 /**
  * @file PostModal.tsx
@@ -41,6 +44,7 @@ interface Comment {
   user_id: string;
   user: {
     id: string;
+    clerk_id: string;
     name: string;
   };
 }
@@ -246,6 +250,10 @@ export default function PostModal({ postId, open, onOpenChange }: PostModalProps
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-5xl w-full max-h-[90vh] md:max-h-[90vh] h-full md:h-auto p-0 overflow-hidden flex flex-col md:flex-row md:rounded-lg duration-300">
+        <DialogTitle className="sr-only">게시물 상세</DialogTitle>
+        <DialogDescription className="sr-only">
+          게시물 이미지와 댓글을 확인할 수 있습니다
+        </DialogDescription>
         {loading ? (
           <div className="flex items-center justify-center w-full h-[500px] md:h-[600px]">
             <Loader2 className="w-8 h-8 animate-spin text-[var(--instagram-text-secondary)]" />
@@ -342,12 +350,12 @@ export default function PostModal({ postId, open, onOpenChange }: PostModalProps
                   <div className="space-y-4">
                     {comments.map((comment) => (
                       <div key={comment.id} className="flex gap-3 group">
-                        <Link href={`/profile/${post.user.clerk_id}`} onClick={() => onOpenChange(false)}>
+                        <Link href={`/profile/${comment.user.clerk_id || comment.user.id}`} onClick={() => onOpenChange(false)}>
                           <div className="w-8 h-8 rounded-full bg-gray-200 dark:bg-gray-700 flex-shrink-0" />
                         </Link>
                         <div className="flex-1 min-w-0">
                           <div className="flex items-start gap-2">
-                            <Link href={`/profile/${post.user.clerk_id}`} onClick={() => onOpenChange(false)}>
+                            <Link href={`/profile/${comment.user.clerk_id || comment.user.id}`} onClick={() => onOpenChange(false)}>
                               <span className="font-semibold text-sm text-[var(--instagram-text-primary)] dark:text-[var(--foreground)] hover:opacity-70">
                                 {comment.user.name}
                               </span>
@@ -421,6 +429,18 @@ export default function PostModal({ postId, open, onOpenChange }: PostModalProps
                       <MessageCircle className="w-6 h-6" />
                     </button>
                     <button
+                      onClick={async () => {
+                        if (!post) return;
+                        const postUrl = `${window.location.origin}/post/${post.id}`;
+                        const result = await shareContent(
+                          postUrl,
+                          `${post.user.name}님의 게시물`,
+                          post.caption || ""
+                        );
+                        if (result.success && result.method === "clipboard") {
+                          alert("링크가 클립보드에 복사되었습니다.");
+                        }
+                      }}
                       className="text-[var(--instagram-text-primary)] dark:text-[var(--foreground)] transition-transform hover:scale-110"
                       aria-label="공유"
                     >

@@ -94,7 +94,7 @@ export async function GET(
     // 사용자 정보 가져오기
     const { data: userData, error: userError } = await supabase
       .from("users")
-      .select("id, clerk_id, name")
+      .select("id, clerk_id, name, profile_image_url")
       .eq("id", postData.user_id)
       .single();
 
@@ -106,14 +106,16 @@ export async function GET(
     }
 
     // Clerk에서 사용자 프로필 이미지 가져오기 (선택적)
-    let userImageUrl: string | undefined = undefined;
-    try {
-      const clerkClientInstance = await clerkClient();
-      const clerkUser = await clerkClientInstance.users.getUser(userData.clerk_id);
-      userImageUrl = clerkUser.imageUrl || undefined;
-    } catch (err) {
-      // Clerk 사용자를 찾을 수 없는 경우 무시
-      console.warn("Failed to fetch Clerk user image:", err);
+    let userImageUrl: string | undefined = userData.profile_image_url || undefined;
+    if (!userImageUrl) {
+      try {
+        const clerkClientInstance = await clerkClient();
+        const clerkUser = await clerkClientInstance.users.getUser(userData.clerk_id);
+        userImageUrl = clerkUser.imageUrl || undefined;
+      } catch (err) {
+        // Clerk 사용자를 찾을 수 없는 경우 무시
+        console.warn("Failed to fetch Clerk user image:", err);
+      }
     }
 
     // 현재 로그인한 사용자의 좋아요 상태 확인
@@ -155,7 +157,7 @@ export async function GET(
     ];
     const { data: commentUsersData } = await supabase
       .from("users")
-      .select("id, name")
+      .select("id, clerk_id, name")
       .in("id", commentUserIds);
 
     // 댓글과 사용자 정보 조합
@@ -168,6 +170,7 @@ export async function GET(
         user_id: comment.user_id,
         user: {
           id: user?.id || comment.user_id,
+          clerk_id: user?.clerk_id || "",
           name: user?.name || "Unknown",
         },
       };

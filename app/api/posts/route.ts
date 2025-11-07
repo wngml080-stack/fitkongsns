@@ -25,6 +25,21 @@ import { getServiceRoleClient } from "@/lib/supabase/service-role";
 
 const DEFAULT_LIMIT = 10;
 const DEFAULT_PAGE = 1;
+const HASHTAG_REGEX = /#([\p{L}\p{N}_]+)/gu;
+
+function extractHashtags(text: string | null | undefined): string[] {
+  if (!text) {
+    return [];
+  }
+  const tags = new Set<string>();
+  for (const match of text.matchAll(HASHTAG_REGEX)) {
+    const tag = match[1]?.toLowerCase();
+    if (tag) {
+      tags.add(tag);
+    }
+  }
+  return Array.from(tags);
+}
 
 export async function GET(request: NextRequest) {
   try {
@@ -33,6 +48,10 @@ export async function GET(request: NextRequest) {
     const limit = parseInt(searchParams.get("limit") || String(DEFAULT_LIMIT), 10);
     const offset = (page - 1) * limit;
     const userIdParam = searchParams.get("userId"); // Clerk ID (선택적)
+    const hashtagParamRaw = searchParams.get("hashtag");
+    const normalizedHashtag = hashtagParamRaw
+      ? hashtagParamRaw.trim().replace(/^#+/, "").toLowerCase()
+      : null;
 
     // 게시물 목록은 공개 데이터이므로 공개 클라이언트 사용
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
@@ -62,85 +81,159 @@ export async function GET(request: NextRequest) {
     // 뷰가 없을 경우를 대비해 posts 테이블을 직접 조회
     let postsData: any[] | null = null;
     let postsError: any = null;
+    let totalCount: number | null = null;
 
-    // 먼저 post_stats 뷰를 시도
-    let viewQuery = supabase
-      .from("post_stats")
-      .select("*")
-      .order("created_at", { ascending: false });
+    if (normalizedHashtag) {
+      const { data: hashtagRecord, error: hashtagError } = await supabase
+        .from("hashtags")
+        .select("id")
+        .eq("tag", normalizedHashtag)
+        .single();
 
-    // userId 필터 적용
-    if (targetUserId) {
-      viewQuery = viewQuery.eq("user_id", targetUserId);
-    }
-
-    const viewResult = await viewQuery.range(offset, offset + limit - 1);
-
-    if (viewResult.error) {
-      console.warn("post_stats 뷰 조회 실패, posts 테이블 직접 조회 시도:", viewResult.error);
-      
-      // 뷰가 없으면 posts 테이블을 직접 조회
-      let postsQuery = supabase
-        .from("posts")
-        .select("id, user_id, image_url, caption, created_at")
-        .order("created_at", { ascending: false });
-
-      // userId 필터 적용
-      if (targetUserId) {
-        postsQuery = postsQuery.eq("user_id", targetUserId);
-      }
-
-      const postsResult = await postsQuery.range(offset, offset + limit - 1);
-
-      if (postsResult.error) {
-        console.error("Error fetching posts:", postsResult.error);
+      if (hashtagError && hashtagError.code !== "PGRST116") {
+        console.error("Error fetching hashtag:", hashtagError);
         return NextResponse.json(
-          { 
-            error: "게시물을 불러오는데 실패했습니다.",
-            details: postsResult.error.message || String(postsResult.error)
-          },
+          { error: "해시태그 정보를 불러오는데 실패했습니다." },
           { status: 500 }
         );
       }
 
-      // posts 테이블 데이터를 post_stats 형식으로 변환
-      const postIds = (postsResult.data || []).map((p) => p.id);
-      
-      // 좋아요 수와 댓글 수 계산
-      const [likesResult, commentsResult] = await Promise.all([
-        supabase
-          .from("likes")
-          .select("post_id")
-          .in("post_id", postIds),
-        supabase
-          .from("comments")
-          .select("post_id")
-          .in("post_id", postIds),
-      ]);
+      if (!hashtagRecord) {
+        return NextResponse.json({ posts: [], hasMore: false, page });
+      }
 
-      // post_id별로 카운트 계산
-      const likesCountMap = new Map<string, number>();
-      const commentsCountMap = new Map<string, number>();
+      const { data: hashtagPosts, error: hashtagPostsError } = await supabase
+        .from("post_hashtags")
+        .select("post_id, created_at")
+        .eq("hashtag_id", hashtagRecord.id)
+        .order("created_at", { ascending: false });
 
-      (likesResult.data || []).forEach((like: any) => {
-        likesCountMap.set(like.post_id, (likesCountMap.get(like.post_id) || 0) + 1);
-      });
+      if (hashtagPostsError) {
+        console.error("Error fetching post hashtags:", hashtagPostsError);
+        return NextResponse.json(
+          { error: "해시태그 게시물을 불러오는데 실패했습니다." },
+          { status: 500 }
+        );
+      }
 
-      (commentsResult.data || []).forEach((comment: any) => {
-        commentsCountMap.set(comment.post_id, (commentsCountMap.get(comment.post_id) || 0) + 1);
-      });
+      const allPostIds = (hashtagPosts || []).map((row) => row.post_id);
+      totalCount = allPostIds.length;
 
-      postsData = (postsResult.data || []).map((post) => ({
-        post_id: post.id,
-        user_id: post.user_id,
-        image_url: post.image_url,
-        caption: post.caption,
-        created_at: post.created_at,
-        likes_count: likesCountMap.get(post.id) || 0,
-        comments_count: commentsCountMap.get(post.id) || 0,
-      }));
-    } else {
-      postsData = viewResult.data;
+      if (allPostIds.length === 0) {
+        return NextResponse.json({ posts: [], hasMore: false, page });
+      }
+
+      const pagedPostIds = allPostIds.slice(offset, offset + limit);
+
+      if (pagedPostIds.length === 0) {
+        return NextResponse.json({ posts: [], hasMore: offset + limit < totalCount, page });
+      }
+
+      const { data: hashtagPostsData, error: hashtagPostsDataError } = await supabase
+        .from("post_stats")
+        .select("*")
+        .in("post_id", pagedPostIds)
+        .order("created_at", { ascending: false });
+
+      if (hashtagPostsDataError) {
+        console.error("Error fetching posts for hashtag:", hashtagPostsDataError);
+        return NextResponse.json(
+          { error: "게시물을 불러오는데 실패했습니다." },
+          { status: 500 }
+        );
+      }
+
+      postsData = hashtagPostsData;
+    }
+
+    if (!postsData) {
+      // 먼저 post_stats 뷰를 시도
+      let viewQuery = supabase
+        .from("post_stats")
+        .select("*")
+        .order("created_at", { ascending: false });
+
+      // userId 필터 적용
+      if (targetUserId) {
+        viewQuery = viewQuery.eq("user_id", targetUserId);
+      }
+
+      if (normalizedHashtag) {
+        // 해시태그가 있지만 post_stats에서 필터링할 수 없으므로 위에서 처리
+      }
+
+      const viewResult = await viewQuery.range(offset, offset + limit - 1);
+
+      if (viewResult.error) {
+        console.warn("post_stats 뷰 조회 실패, posts 테이블 직접 조회 시도:", viewResult.error);
+        
+        // 뷰가 없으면 posts 테이블을 직접 조회
+        let postsQuery = supabase
+          .from("posts")
+          .select("id, user_id, image_url, caption, created_at")
+          .order("created_at", { ascending: false });
+
+        // userId 필터 적용
+        if (targetUserId) {
+          postsQuery = postsQuery.eq("user_id", targetUserId);
+        }
+
+        const postsResult = await postsQuery.range(offset, offset + limit - 1);
+
+        if (postsResult.error) {
+          console.error("Error fetching posts:", postsResult.error);
+          return NextResponse.json(
+            { 
+              error: "게시물을 불러오는데 실패했습니다.",
+              details: postsResult.error.message || String(postsResult.error)
+            },
+            { status: 500 }
+          );
+        }
+
+        // posts 테이블 데이터를 post_stats 형식으로 변환
+        const postIds = (postsResult.data || []).map((p) => p.id);
+        
+        // 좋아요 수와 댓글 수 계산
+        const [likesResult, commentsResult] = await Promise.all([
+          supabase
+            .from("likes")
+            .select("post_id")
+            .in("post_id", postIds),
+          supabase
+            .from("comments")
+            .select("post_id")
+            .in("post_id", postIds),
+        ]);
+
+        // post_id별로 카운트 계산
+        const likesCountMap = new Map<string, number>();
+        const commentsCountMap = new Map<string, number>();
+
+        (likesResult.data || []).forEach((like: any) => {
+          likesCountMap.set(like.post_id, (likesCountMap.get(like.post_id) || 0) + 1);
+        });
+
+        (commentsResult.data || []).forEach((comment: any) => {
+          commentsCountMap.set(comment.post_id, (commentsCountMap.get(comment.post_id) || 0) + 1);
+        });
+
+        postsData = (postsResult.data || []).map((post) => ({
+          post_id: post.id,
+          user_id: post.user_id,
+          image_url: post.image_url,
+          caption: post.caption,
+          created_at: post.created_at,
+          likes_count: likesCountMap.get(post.id) || 0,
+          comments_count: commentsCountMap.get(post.id) || 0,
+        }));
+      } else {
+        postsData = viewResult.data;
+      }
+    }
+
+    if (totalCount === null) {
+      totalCount = null; // will be computed later via count query
     }
 
     if (!postsData || postsData.length === 0) {
@@ -155,7 +248,7 @@ export async function GET(request: NextRequest) {
     const userIds = [...new Set(postsData.map((post) => post.user_id))];
     const { data: usersData, error: usersError } = await supabase
       .from("users")
-      .select("id, clerk_id, name")
+      .select("id, clerk_id, name, profile_image_url")
       .in("id", userIds);
 
     if (usersError) {
@@ -169,13 +262,19 @@ export async function GET(request: NextRequest) {
     // Clerk에서 사용자 프로필 이미지 가져오기 (선택적, 에러가 나도 계속 진행)
     const userImageMap = new Map<string, string>();
 
+    (usersData || []).forEach((user) => {
+      if (user.profile_image_url) {
+        userImageMap.set(user.id, user.profile_image_url);
+      }
+    });
+
     try {
       const clerkClientInstance = await clerkClient();
       await Promise.all(
         (usersData || []).map(async (user) => {
           try {
             const clerkUser = await clerkClientInstance.users.getUser(user.clerk_id);
-            if (clerkUser.imageUrl) {
+            if (clerkUser.imageUrl && !userImageMap.has(user.id)) {
               userImageMap.set(user.id, clerkUser.imageUrl);
             }
           } catch (err) {
@@ -203,7 +302,7 @@ export async function GET(request: NextRequest) {
     ];
     const { data: commentUsersData } = await supabase
       .from("users")
-      .select("id, name")
+      .select("id, clerk_id, name")
       .in("id", commentUserIds);
 
     // 댓글과 사용자 정보 조합
@@ -213,6 +312,7 @@ export async function GET(request: NextRequest) {
         ...comment,
         user: {
           id: user?.id || comment.user_id,
+          clerk_id: user?.clerk_id || "",
           name: user?.name || "Unknown",
         },
       };
@@ -271,6 +371,7 @@ export async function GET(request: NextRequest) {
           created_at: comment.created_at,
           user: {
             id: comment.user.id,
+            clerk_id: comment.user.clerk_id,
             name: comment.user.name,
           },
         })),
@@ -278,18 +379,22 @@ export async function GET(request: NextRequest) {
     });
 
     // 다음 페이지가 있는지 확인
-    let countQuery = supabase
-      .from("post_stats")
-      .select("*", { count: "exact", head: true });
+    let hasMore = false;
 
-    // userId 필터 적용
-    if (targetUserId) {
-      countQuery = countQuery.eq("user_id", targetUserId);
+    if (totalCount !== null) {
+      hasMore = offset + limit < totalCount;
+    } else {
+      let countQuery = supabase
+        .from("post_stats")
+        .select("post_id", { count: "exact", head: true });
+
+      if (targetUserId) {
+        countQuery = countQuery.eq("user_id", targetUserId);
+      }
+
+      const { count } = await countQuery;
+      hasMore = count ? offset + limit < count : false;
     }
-
-    const { count } = await countQuery;
-
-    const hasMore = count ? offset + limit < count : false;
 
     return NextResponse.json({
       posts,
@@ -419,6 +524,47 @@ export async function POST(request: NextRequest) {
         { error: "게시물 저장에 실패했습니다." },
         { status: 500 }
       );
+    }
+
+    // 해시태그 저장
+    const hashtags = extractHashtags(caption || null);
+    if (hashtags.length > 0) {
+      try {
+        const { data: upsertedTags } = await supabase
+          .from("hashtags")
+          .upsert(
+            hashtags.map((tag) => ({ tag })),
+            { onConflict: "tag" }
+          )
+          .select("id, tag");
+
+        let tagRecords = upsertedTags || [];
+
+        if (tagRecords.length < hashtags.length) {
+          const { data: fetchedTags } = await supabase
+            .from("hashtags")
+            .select("id, tag")
+            .in("tag", hashtags);
+          tagRecords = fetchedTags || tagRecords;
+        }
+
+        if (tagRecords.length > 0) {
+          const postHashtagRows = tagRecords.map((tag) => ({
+            post_id: postData.id,
+            hashtag_id: tag.id,
+          }));
+
+          const { error: linkError } = await supabase
+            .from("post_hashtags")
+            .upsert(postHashtagRows, { onConflict: "post_id,hashtag_id" });
+
+          if (linkError) {
+            console.error("Error linking post hashtags:", linkError);
+          }
+        }
+      } catch (err) {
+        console.error("Error processing hashtags:", err);
+      }
     }
 
     return NextResponse.json(

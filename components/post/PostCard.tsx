@@ -11,6 +11,7 @@ import { SignInButton } from "@clerk/nextjs";
 import CommentForm from "@/components/comment/CommentForm";
 import PostModal from "./PostModal";
 import { getUserFriendlyErrorMessage, extractErrorMessage } from "@/lib/utils/error-handler";
+import { shareContent } from "@/lib/utils/share";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -50,6 +51,7 @@ interface Comment {
   user_id?: string; // 삭제 버튼 표시를 위해 추가
   user: {
     id: string;
+    clerk_id: string;
     name: string;
   };
 }
@@ -339,7 +341,7 @@ export default function PostCard({ post, onDelete }: PostCardProps) {
       ];
       const { data: commentUsersData } = await supabase
         .from("users")
-        .select("id, name")
+        .select("id, clerk_id, name")
         .in("id", commentUserIds);
 
       // 댓글과 사용자 정보 조합
@@ -352,6 +354,7 @@ export default function PostCard({ post, onDelete }: PostCardProps) {
           user_id: comment.user_id, // 삭제 버튼 표시를 위해 추가
           user: {
             id: user?.id || comment.user_id,
+            clerk_id: user?.clerk_id || "",
             name: user?.name || "Unknown",
           },
         };
@@ -388,7 +391,7 @@ export default function PostCard({ post, onDelete }: PostCardProps) {
       {/* 헤더 */}
       <header className="h-[60px] flex items-center justify-between px-4 border-b border-[var(--instagram-border)] dark:border-[var(--border)]">
         <div className="flex items-center gap-3">
-          <Link href={`/profile/${post.user.id}`}>
+          <Link href={`/profile/${post.user.clerk_id || post.user.id}`}>
             <Image
               src={profileImageUrl}
               alt={post.user.name}
@@ -399,7 +402,7 @@ export default function PostCard({ post, onDelete }: PostCardProps) {
           </Link>
           <div className="flex flex-col">
             <Link
-              href={`/profile/${post.user.id}`}
+              href={`/profile/${post.user.clerk_id || post.user.id}`}
               className="font-semibold text-sm text-[var(--instagram-text-primary)] dark:text-[var(--foreground)] hover:opacity-70"
             >
               {post.user.name}
@@ -507,6 +510,17 @@ export default function PostCard({ post, onDelete }: PostCardProps) {
             <MessageCircle className="w-6 h-6" />
           </button>
           <button
+            onClick={async () => {
+              const postUrl = `${window.location.origin}/post/${post.id}`;
+              const result = await shareContent(
+                postUrl,
+                `${post.user.name}님의 게시물`,
+                post.caption || ""
+              );
+              if (result.success && result.method === "clipboard") {
+                alert("링크가 클립보드에 복사되었습니다.");
+              }
+            }}
             className="text-[var(--instagram-text-primary)] dark:text-[var(--foreground)] transition-transform hover:scale-110"
             aria-label="공유"
           >
@@ -534,7 +548,7 @@ export default function PostCard({ post, onDelete }: PostCardProps) {
         {post.caption && (
           <div className="text-sm text-[var(--instagram-text-primary)] dark:text-[var(--foreground)]">
             <Link
-              href={`/profile/${post.user.id}`}
+              href={`/profile/${post.user.clerk_id || post.user.id}`}
               className="font-semibold hover:opacity-70 mr-2"
             >
               {post.user.name}
@@ -571,7 +585,7 @@ export default function PostCard({ post, onDelete }: PostCardProps) {
                 >
                   <div className="flex-1 text-sm text-[var(--instagram-text-primary)] dark:text-[var(--foreground)]">
                     <Link
-                      href={`/profile/${comment.user.id}`}
+                      href={`/profile/${comment.user.clerk_id || comment.user.id}`}
                       className="font-semibold hover:opacity-70 mr-2"
                     >
                       {comment.user.name}
