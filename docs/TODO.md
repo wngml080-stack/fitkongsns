@@ -38,7 +38,8 @@
 - [x] Next.js + TypeScript 프로젝트 생성
 - [x] Tailwind CSS 설정 (인스타 컬러 스키마)
   - [x] `globals.css` 파일 존재 (Instagram 컬러 변수 추가 필요)
-  - [ ] 타이포그래피 설정
+  - [x] Instagram 컬러 변수 추가 완료 - OS
+  - [x] 타이포그래피 설정 - OS
 - [x] Clerk 인증 연동 (한국어 설정)
   - [x] `middleware.ts` Clerk 미들웨어 설정
   - [x] `app/layout.tsx` ClerkProvider 통합
@@ -67,46 +68,48 @@
   - [x] `app/auth-test/page.tsx` (Clerk + Supabase 인증 테스트)
   - [x] `app/storage-test/page.tsx` (Supabase Storage 테스트)
 - [x] 기본 컴포넌트
-  - [x] `components/Navbar.tsx` 네비게이션 바
+  - [x] `components/Navbar.tsx` 네비게이션 바 (레이아웃 구조로 대체됨)
 
 ### 1-2. 레이아웃 구조
-- [ ] `components/layout/Sidebar.tsx` 컴포넌트
-  - [ ] Desktop (244px 너비, 아이콘 + 텍스트)
-  - [ ] Tablet (72px 너비, 아이콘만)
-  - [ ] Mobile (숨김)
-  - [ ] Hover 효과 및 Active 상태 스타일
-- [ ] `components/layout/Header.tsx` 컴포넌트 (Mobile 전용)
-  - [ ] 높이 60px
-  - [ ] 로고 + 알림/DM/프로필 아이콘
-- [ ] `components/layout/BottomNav.tsx` 컴포넌트 (Mobile 전용)
-  - [ ] 높이 50px
-  - [ ] 5개 아이콘 (홈, 검색, 만들기, 좋아요, 프로필)
-- [ ] `app/(main)/layout.tsx` Route Group 레이아웃
-  - [ ] Sidebar 통합
-  - [ ] Mobile Header/BottomNav 통합
-  - [ ] 반응형 레이아웃 적용
+- [x] `components/layout/Sidebar.tsx` 컴포넌트
+  - [x] Desktop (244px 너비, 아이콘 + 텍스트)
+  - [x] Tablet (72px 너비, 아이콘만)
+  - [x] Mobile (숨김)
+  - [x] Hover 효과 및 Active 상태 스타일
+- [x] `components/layout/Header.tsx` 컴포넌트 (Mobile 전용)
+  - [x] 높이 60px
+  - [x] 로고 + 알림/DM/프로필 아이콘
+- [x] `components/layout/BottomNav.tsx` 컴포넌트 (Mobile 전용)
+  - [x] 높이 50px
+  - [x] 5개 아이콘 (홈, 검색, 만들기, 좋아요, 프로필)
+- [x] `app/(main)/layout.tsx` Route Group 레이아웃
+  - [x] Sidebar 통합
+  - [x] Mobile Header/BottomNav 통합
+  - [x] 반응형 레이아웃 적용
+- [x] `app/layout.tsx`에서 기존 Navbar 제거 - OS
+- [x] `app/page.tsx`를 `app/(main)/page.tsx`로 이동 및 홈 피드 플레이스홀더 생성 - OS
 
 ### 1-3. 홈 피드 - 게시물 목록
-- [ ] `components/post/PostCard.tsx` 컴포넌트
-  - [ ] 헤더 (프로필 이미지 32px, 사용자명, 시간, ⋯ 메뉴)
-  - [ ] 이미지 영역 (1:1 정사각형)
-  - [ ] 액션 버튼 (❤️ 좋아요, 💬 댓글, ✈️ 공유, 🔖 북마크)
-  - [ ] 컨텐츠 (좋아요 수, 캡션, 댓글 미리보기 2개)
-  - [ ] 캡션 2줄 초과 시 "... 더 보기" 처리
-- [ ] `components/post/PostCardSkeleton.tsx` 로딩 UI
-  - [ ] Skeleton UI (회색 박스 애니메이션)
-  - [ ] Shimmer 효과
-- [ ] `components/post/PostFeed.tsx` 컴포넌트
-  - [ ] 게시물 목록 표시
-  - [ ] 시간 역순 정렬
-- [ ] `app/(main)/page.tsx` 홈 피드 페이지
-  - [ ] PostFeed 통합
-  - [ ] 배경색 #FAFAFA
-  - [ ] PostCard 최대 너비 630px, 중앙 정렬
-- [ ] `app/api/posts/route.ts` GET API
-  - [ ] 페이지네이션 (10개씩)
-  - [ ] 시간 역순 정렬
-  - [ ] 사용자 정보 포함
+- [x] `components/post/PostCard.tsx` 컴포넌트
+  - [x] 헤더 (프로필 이미지 32px, 사용자명, 시간, ⋯ 메뉴)
+  - [x] 이미지 영역 (1:1 정사각형)
+  - [x] 액션 버튼 (❤️ 좋아요, 💬 댓글, ✈️ 공유, 🔖 북마크)
+  - [x] 컨텐츠 (좋아요 수, 캡션, 댓글 미리보기 2개)
+  - [x] 캡션 2줄 초과 시 "... 더 보기" 처리
+- [x] `components/post/PostCardSkeleton.tsx` 로딩 UI
+  - [x] Skeleton UI (회색 박스 애니메이션)
+  - [x] Shimmer 효과
+- [x] `components/post/PostFeed.tsx` 컴포넌트
+  - [x] 게시물 목록 표시
+  - [x] 시간 역순 정렬
+- [x] `app/(main)/page.tsx` 홈 피드 페이지
+  - [x] PostFeed 통합
+  - [x] 배경색 #FAFAFA
+  - [x] PostCard 최대 너비 630px, 중앙 정렬
+- [x] `app/api/posts/route.ts` GET API
+  - [x] 페이지네이션 (10개씩)
+  - [x] 시간 역순 정렬
+  - [x] 사용자 정보 포함
 
 ### 1-4. 홈 피드 - 좋아요 기능
 - [x] `likes` 테이블 생성 (이미 완료)
@@ -249,7 +252,15 @@
   - [ ] 이미지 업로드 확인
   - [ ] 모든 기능 동작 확인
 
-## 5. 1차 MVP 제외 기능 (2차 확장)
+## 5. 추가 완료 작업 (요청 이외)
+
+다음 작업들은 요청 이외에 추가로 완료되었습니다:
+- [x] `lib/utils/format-time.ts` 유틸리티 함수
+  - [x] 상대 시간 포맷팅 함수 (`formatRelativeTime`)
+  - [x] "3시간 전", "2일 전" 형식 지원
+  - [x] PostCard에서 사용
+
+## 6. 1차 MVP 제외 기능 (2차 확장)
 
 다음 기능들은 2차 확장에서 구현 예정:
 - [ ] 검색 (사용자, 해시태그)
