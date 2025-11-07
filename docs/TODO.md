@@ -138,48 +138,62 @@
 ## 2. 게시물 작성 & 댓글 기능
 
 ### 2-1. 게시물 작성 모달
-- [ ] `components/post/CreatePostModal.tsx` 컴포넌트
-  - [ ] Dialog 기반 모달
-  - [ ] 이미지 업로드 영역
-  - [ ] 이미지 미리보기 UI
-  - [ ] 캡션 입력 필드 (최대 2,200자)
-  - [ ] "게시" 버튼
-- [ ] Sidebar "만들기" 버튼 클릭 시 모달 열기
+- [x] `components/post/CreatePostModal.tsx` 컴포넌트
+  - [x] Dialog 기반 모달
+  - [x] 이미지 업로드 영역 (드래그 앤 드롭 지원)
+  - [x] 이미지 미리보기 UI
+  - [x] 캡션 입력 필드 (최대 2,200자)
+  - [x] "게시" 버튼
+  - [x] 업로드 진행 상태 표시
+  - [x] 에러 처리 및 사용자 피드백
+- [x] Sidebar "만들기" 버튼 클릭 시 모달 열기
 
 ### 2-2. 게시물 작성 - 이미지 업로드
 - [x] Supabase Storage 버킷 생성 (이미 완료)
-- [ ] `app/api/posts/route.ts` POST API
-  - [ ] 이미지 파일 업로드 (최대 5MB 검증)
-  - [ ] Supabase Storage에 저장
-  - [ ] posts 테이블에 데이터 저장
-  - [ ] 파일 타입 검증
-- [ ] 파일 업로드 로직 및 검증
-  - [ ] 이미지 파일만 허용
-  - [ ] 파일 크기 제한
-  - [ ] 업로드 진행 상태 표시
+- [x] `app/api/posts/route.ts` POST API
+  - [x] 이미지 파일 업로드 (최대 5MB 검증)
+  - [x] Supabase Storage에 저장
+  - [x] posts 테이블에 데이터 저장
+  - [x] 파일 타입 검증
+  - [x] Clerk 인증 확인
+- [x] 파일 업로드 로직 및 검증
+  - [x] 이미지 파일만 허용
+  - [x] 파일 크기 제한 (5MB)
+  - [x] 업로드 진행 상태 표시
+  - [x] 게시물 작성 후 피드 자동 새로고침
 
 ### 2-3. 댓글 기능 - UI & 작성
 - [x] `comments` 테이블 생성 (이미 완료)
-- [ ] `components/comment/CommentList.tsx` 컴포넌트
-  - [ ] 댓글 목록 표시
-  - [ ] PostCard: 최신 2개만 미리보기
-  - [ ] 상세 모달: 전체 댓글 + 스크롤
-- [ ] `components/comment/CommentForm.tsx` 컴포넌트
-  - [ ] "댓글 달기..." 입력창
-  - [ ] Enter 또는 "게시" 버튼으로 제출
-- [ ] `app/api/comments/route.ts` POST API
-  - [ ] 댓글 작성
-  - [ ] 사용자 정보 포함
+- [x] `components/comment/CommentList.tsx` 컴포넌트
+  - [x] 댓글 목록 표시 (PostCard에 직접 통합)
+  - [x] PostCard: 최신 2개만 미리보기
+  - [ ] 상세 모달: 전체 댓글 + 스크롤 (3-4에서 구현 예정)
+- [x] `components/comment/CommentForm.tsx` 컴포넌트
+  - [x] "댓글 달기..." 입력창
+  - [x] Enter 또는 "게시" 버튼으로 제출
+  - [x] 로그인하지 않은 사용자: SignInButton으로 감싸기
+  - [x] 제출 중 로딩 상태
+- [x] `app/api/comments/route.ts` POST API
+  - [x] 댓글 작성
+  - [x] 사용자 정보 포함
+  - [x] Clerk 인증 확인
+- [x] PostCard에 CommentForm 통합
+  - [x] 댓글 작성 후 즉시 목록 업데이트
 
 ### 2-4. 댓글 기능 - 삭제 & 무한스크롤
-- [ ] `app/api/comments/[commentId]/route.ts` DELETE API
-  - [ ] 댓글 삭제 (본인만 가능)
-- [ ] 댓글 삭제 버튼 (본인만 표시)
-  - [ ] ⋯ 메뉴에 삭제 옵션
-- [ ] PostFeed 무한 스크롤
-  - [ ] Intersection Observer 사용
-  - [ ] 하단 도달 시 10개씩 추가 로드
-  - [ ] 로딩 상태 표시
+- [x] `app/api/comments/[commentId]/route.ts` DELETE API
+  - [x] 댓글 삭제 (본인만 가능)
+  - [x] Clerk 인증 확인
+  - [x] 소유권 검증
+- [x] 댓글 삭제 버튼 (본인만 표시)
+  - [x] PostCard 댓글 미리보기에 삭제 버튼 추가
+  - [x] Hover 시 표시 (opacity 전환)
+  - [x] 삭제 확인 다이얼로그
+- [x] PostFeed 무한 스크롤
+  - [x] Intersection Observer 사용
+  - [x] 하단 도달 시 10개씩 추가 로드
+  - [x] 로딩 상태 표시 (Skeleton UI)
+  - [x] hasMore 상태에 따른 로드 제어
 
 ## 3. 프로필 페이지 & 팔로우 기능
 
@@ -268,6 +282,15 @@
 ## 5. 추가 완료 작업 (요청 이외)
 
 다음 작업들은 요청 이외에 추가로 완료되었습니다:
+- [x] `next.config.ts` 이미지 도메인 설정
+  - [x] Unsplash 이미지 도메인 추가 (샘플 데이터용)
+  - [x] `images.unsplash.com` remotePatterns에 추가
+- [x] 샘플 데이터 추가 SQL
+  - [x] `supabase/migrations/sns_schema.sql`에 샘플 데이터 추가
+  - [x] 샘플 사용자 4명 (홍길동, 김철수, 이영희, 박민수)
+  - [x] 샘플 게시물 6개
+  - [x] 샘플 좋아요 11개
+  - [x] 샘플 댓글 8개
 - [x] `lib/utils/format-time.ts` 유틸리티 함수
   - [x] 상대 시간 포맷팅 함수 (`formatRelativeTime`)
   - [x] "3시간 전", "2일 전" 형식 지원

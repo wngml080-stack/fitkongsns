@@ -32,11 +32,31 @@ export async function GET(request: NextRequest) {
     const page = parseInt(searchParams.get("page") || String(DEFAULT_PAGE), 10);
     const limit = parseInt(searchParams.get("limit") || String(DEFAULT_LIMIT), 10);
     const offset = (page - 1) * limit;
+    const userIdParam = searchParams.get("userId"); // Clerk ID (선택적)
 
     // 게시물 목록은 공개 데이터이므로 공개 클라이언트 사용
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
     const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
     const supabase = createClient(supabaseUrl, supabaseKey);
+
+    // userId 파라미터가 있으면 Supabase user_id로 변환
+    let targetUserId: string | null = null;
+    if (userIdParam) {
+      const { data: userData, error: userError } = await supabase
+        .from("users")
+        .select("id")
+        .eq("clerk_id", userIdParam)
+        .single();
+
+      if (userError || !userData) {
+        return NextResponse.json(
+          { error: "사용자를 찾을 수 없습니다." },
+          { status: 404 }
+        );
+      }
+
+      targetUserId = userData.id;
+    }
 
     // post_stats 뷰에서 게시물 목록 가져오기 (시간 역순)
     // 뷰가 없을 경우를 대비해 posts 테이블을 직접 조회
@@ -44,21 +64,33 @@ export async function GET(request: NextRequest) {
     let postsError: any = null;
 
     // 먼저 post_stats 뷰를 시도
-    const viewResult = await supabase
+    let viewQuery = supabase
       .from("post_stats")
       .select("*")
-      .order("created_at", { ascending: false })
-      .range(offset, offset + limit - 1);
+      .order("created_at", { ascending: false });
+
+    // userId 필터 적용
+    if (targetUserId) {
+      viewQuery = viewQuery.eq("user_id", targetUserId);
+    }
+
+    const viewResult = await viewQuery.range(offset, offset + limit - 1);
 
     if (viewResult.error) {
       console.warn("post_stats 뷰 조회 실패, posts 테이블 직접 조회 시도:", viewResult.error);
       
       // 뷰가 없으면 posts 테이블을 직접 조회
-      const postsResult = await supabase
+      let postsQuery = supabase
         .from("posts")
         .select("id, user_id, image_url, caption, created_at")
-        .order("created_at", { ascending: false })
-        .range(offset, offset + limit - 1);
+        .order("created_at", { ascending: false });
+
+      // userId 필터 적용
+      if (targetUserId) {
+        postsQuery = postsQuery.eq("user_id", targetUserId);
+      }
+
+      const postsResult = await postsQuery.range(offset, offset + limit - 1);
 
       if (postsResult.error) {
         console.error("Error fetching posts:", postsResult.error);
@@ -246,9 +278,16 @@ export async function GET(request: NextRequest) {
     });
 
     // 다음 페이지가 있는지 확인
-    const { count } = await supabase
+    let countQuery = supabase
       .from("post_stats")
       .select("*", { count: "exact", head: true });
+
+    // userId 필터 적용
+    if (targetUserId) {
+      countQuery = countQuery.eq("user_id", targetUserId);
+    }
+
+    const { count } = await countQuery;
 
     const hasMore = count ? offset + limit < count : false;
 

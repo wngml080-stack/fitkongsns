@@ -4,14 +4,83 @@ import { createClerkSupabaseClient } from "@/lib/supabase/server";
 
 /**
  * @file route.ts
- * @description 좋아요 추가/제거 API
+ * @description 좋아요 추가/제거/조회 API
  *
  * 주요 기능:
+ * - GET: 좋아요 상태 확인
  * - POST: 좋아요 추가
  * - DELETE: 좋아요 제거
  * - Clerk 인증 확인
  * - 중복 좋아요 방지 (UNIQUE 제약)
  */
+
+export async function GET(request: NextRequest) {
+  try {
+    // Clerk 인증 확인
+    const { userId } = await auth();
+
+    if (!userId) {
+      return NextResponse.json(
+        { error: "로그인이 필요합니다." },
+        { status: 401 }
+      );
+    }
+
+    const searchParams = request.nextUrl.searchParams;
+    const post_id = searchParams.get("post_id");
+
+    if (!post_id) {
+      return NextResponse.json(
+        { error: "post_id가 필요합니다." },
+        { status: 400 }
+      );
+    }
+
+    // Supabase 클라이언트 생성
+    const supabase = createClerkSupabaseClient();
+
+    // Clerk 사용자 ID로 Supabase users 테이블에서 user_id 찾기
+    const { data: userData, error: userError } = await supabase
+      .from("users")
+      .select("id")
+      .eq("clerk_id", userId)
+      .single();
+
+    if (userError || !userData) {
+      return NextResponse.json(
+        { error: "사용자 정보를 찾을 수 없습니다." },
+        { status: 404 }
+      );
+    }
+
+    // 좋아요 상태 확인
+    const { data: likeData, error: likeError } = await supabase
+      .from("likes")
+      .select("id")
+      .eq("post_id", post_id)
+      .eq("user_id", userData.id)
+      .single();
+
+    if (likeError && likeError.code !== "PGRST116") {
+      // PGRST116은 "no rows returned" 에러 (좋아요가 없는 경우)
+      console.error("Like check error:", likeError);
+      return NextResponse.json(
+        { error: "좋아요 상태 확인에 실패했습니다." },
+        { status: 500 }
+      );
+    }
+
+    return NextResponse.json({
+      isLiked: !!likeData,
+    });
+  } catch (error) {
+    console.error("GET /api/likes error:", error);
+    return NextResponse.json(
+      { error: "서버 오류가 발생했습니다." },
+      { status: 500 }
+    );
+  }
+}
 
 export async function POST(request: NextRequest) {
   try {

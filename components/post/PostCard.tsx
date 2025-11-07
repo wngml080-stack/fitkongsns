@@ -84,24 +84,16 @@ export default function PostCard({ post }: PostCardProps) {
 
     const checkLikeStatus = async () => {
       try {
-        // Clerk user_id로 Supabase user_id 찾기
-        const { data: userData } = await supabase
-          .from("users")
-          .select("id")
-          .eq("clerk_id", userId)
-          .single();
+        // API를 통해 좋아요 상태 확인
+        const response = await fetch(`/api/likes?post_id=${post.id}`);
+        
+        if (!response.ok) {
+          // 에러는 무시 (좋아요가 없는 경우)
+          return;
+        }
 
-        if (!userData) return;
-
-        // 좋아요 상태 확인
-        const { data: likeData } = await supabase
-          .from("likes")
-          .select("id")
-          .eq("post_id", post.id)
-          .eq("user_id", userData.id)
-          .single();
-
-        setIsLiked(!!likeData);
+        const data = await response.json();
+        setIsLiked(data.isLiked || false);
       } catch (error) {
         // 에러 무시 (좋아요가 없는 경우)
         console.log("Like status check:", error);
@@ -109,7 +101,7 @@ export default function PostCard({ post }: PostCardProps) {
     };
 
     checkLikeStatus();
-  }, [isSignedIn, userId, post.id, supabase]);
+  }, [isSignedIn, userId, post.id]);
 
   // 좋아요 토글 함수
   const handleLikeToggle = async () => {
