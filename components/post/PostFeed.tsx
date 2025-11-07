@@ -4,6 +4,7 @@ import { useEffect, useState, useRef, useCallback } from "react";
 import PostCard from "./PostCard";
 import PostCardSkeleton from "./PostCardSkeleton";
 import { getUserFriendlyErrorMessage, extractErrorMessage } from "@/lib/utils/error-handler";
+import type { MentionItem } from "@/components/ui/MentionText";
 
 /**
  * @file PostFeed.tsx
