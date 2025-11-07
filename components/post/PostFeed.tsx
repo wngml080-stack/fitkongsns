@@ -3,6 +3,7 @@
 import { useEffect, useState, useRef, useCallback } from "react";
 import PostCard from "./PostCard";
 import PostCardSkeleton from "./PostCardSkeleton";
+import { getUserFriendlyErrorMessage, extractErrorMessage } from "@/lib/utils/error-handler";
 
 /**
  * @file PostFeed.tsx
@@ -117,11 +118,8 @@ export default function PostFeed() {
       const response = await fetch(`/api/posts?page=${targetPage}&limit=10`);
       
       if (!response.ok) {
-        // API에서 반환한 실제 오류 메시지 가져오기
-        const errorData = await response.json().catch(() => ({}));
-        const errorMessage = errorData.details 
-          ? `${errorData.error}: ${errorData.details}`
-          : errorData.error || "게시물을 불러오는데 실패했습니다.";
+        // 사용자 친화적 에러 메시지 추출
+        const errorMessage = await extractErrorMessage(response);
         throw new Error(errorMessage);
       }
 
@@ -136,7 +134,8 @@ export default function PostFeed() {
       setHasMore(data.hasMore);
       setPage(data.page);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "알 수 없는 오류가 발생했습니다.");
+      const errorMessage = getUserFriendlyErrorMessage(err);
+      setError(errorMessage);
       console.error("Error fetching posts:", err);
     } finally {
       setLoading(false);
@@ -163,11 +162,13 @@ export default function PostFeed() {
 
   if (error) {
     return (
-      <div className="text-center py-12">
-        <p className="text-[var(--instagram-text-secondary)] mb-4">{error}</p>
+      <div className="text-center py-12 px-4">
+        <p className="text-[var(--instagram-text-secondary)] dark:text-[var(--muted-foreground)] mb-4">
+          {error}
+        </p>
         <button
-          onClick={fetchPosts}
-          className="text-[var(--instagram-blue)] hover:opacity-70 font-semibold"
+          onClick={() => fetchPosts(1, true)}
+          className="text-[var(--instagram-blue)] hover:opacity-70 font-semibold px-4 py-2 rounded-md bg-[var(--instagram-blue)]/10 hover:bg-[var(--instagram-blue)]/20 transition-colors"
         >
           다시 시도
         </button>
@@ -177,18 +178,23 @@ export default function PostFeed() {
 
   if (posts.length === 0) {
     return (
-      <div className="text-center py-12">
-        <p className="text-[var(--instagram-text-secondary)]">
+      <div className="text-center py-12 px-4">
+        <p className="text-[var(--instagram-text-secondary)] dark:text-[var(--muted-foreground)]">
           아직 게시물이 없습니다.
         </p>
       </div>
     );
   }
 
+  // 게시물 삭제 핸들러
+  const handlePostDelete = (postId: string) => {
+    setPosts((prev) => prev.filter((post) => post.id !== postId));
+  };
+
   return (
     <div className="space-y-4">
       {posts.map((post) => (
-        <PostCard key={post.id} post={post} />
+        <PostCard key={post.id} post={post} onDelete={handlePostDelete} />
       ))}
       
       {/* 무한 스크롤 감지용 요소 */}

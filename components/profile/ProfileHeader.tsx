@@ -5,6 +5,7 @@ import { useState, useEffect } from "react";
 import { useAuth, SignInButton } from "@clerk/nextjs";
 import { Button } from "@/components/ui/button";
 import { Loader2 } from "lucide-react";
+import { getUserFriendlyErrorMessage, extractErrorMessage } from "@/lib/utils/error-handler";
 
 /**
  * @file ProfileHeader.tsx
@@ -61,8 +62,8 @@ export default function ProfileHeader({ userId }: ProfileHeaderProps) {
       const response = await fetch(`/api/users/${userId}`);
       
       if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.error || "사용자 정보를 불러오는데 실패했습니다.");
+        const errorMessage = await extractErrorMessage(response);
+        throw new Error(errorMessage);
       }
 
       const data = await response.json();
@@ -70,7 +71,8 @@ export default function ProfileHeader({ userId }: ProfileHeaderProps) {
       setIsFollowing(data.user.isFollowing);
       setFollowersCount(data.user.followers_count);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "알 수 없는 오류가 발생했습니다.");
+      const errorMessage = getUserFriendlyErrorMessage(err);
+      setError(errorMessage);
       console.error("Error fetching user data:", err);
     } finally {
       setLoading(false);
@@ -105,8 +107,8 @@ export default function ProfileHeader({ userId }: ProfileHeaderProps) {
       });
 
       if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.error || "팔로우 처리에 실패했습니다.");
+        const errorMessage = await extractErrorMessage(response);
+        throw new Error(errorMessage);
       }
 
       // 성공 시 데이터 새로고침 (정확한 통계를 위해)
@@ -116,7 +118,8 @@ export default function ProfileHeader({ userId }: ProfileHeaderProps) {
       setIsFollowing(previousFollowing);
       setFollowersCount(previousCount);
       console.error("Follow toggle error:", error);
-      alert(error instanceof Error ? error.message : "팔로우 처리에 실패했습니다.");
+      const errorMessage = getUserFriendlyErrorMessage(error);
+      alert(errorMessage);
     } finally {
       setIsToggling(false);
     }

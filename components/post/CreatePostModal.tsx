@@ -10,8 +10,12 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { Upload, X, Loader2 } from "lucide-react";
+import { Upload, X, Loader2, Check } from "lucide-react";
 import Image from "next/image";
+import { getUserFriendlyErrorMessage, extractErrorMessage } from "@/lib/utils/error-handler";
+import Cropper, { Area } from "react-easy-crop";
+import "react-easy-crop/react-easy-crop.css";
+import { getCroppedImg, blobToFile } from "@/lib/utils/image-crop";
 
 /**
  * @file CreatePostModal.tsx
@@ -47,12 +51,20 @@ export default function CreatePostModal({
 }: CreatePostModalProps) {
   const { userId } = useAuth();
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [originalFile, setOriginalFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [croppedPreviewUrl, setCroppedPreviewUrl] = useState<string | null>(null);
   const [caption, setCaption] = useState("");
   const [isUploading, setIsUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isDragging, setIsDragging] = useState(false);
+  
+  // 크롭 관련 상태
+  const [showCrop, setShowCrop] = useState(false);
+  const [crop, setCrop] = useState({ x: 0, y: 0 });
+  const [zoom, setZoom] = useState(1);
+  const [croppedAreaPixels, setCroppedAreaPixels] = useState<Area | null>(null);
 
   // 파일 선택 핸들러
   const handleFileSelect = useCallback((file: File) => {
@@ -69,11 +81,14 @@ export default function CreatePostModal({
     }
 
     setError(null);
-    setSelectedFile(file);
+    setOriginalFile(file);
 
-    // 미리보기 URL 생성
+    // 미리보기 URL 생성 및 크롭 모드로 전환
     const url = URL.createObjectURL(file);
     setPreviewUrl(url);
+    setShowCrop(true);
+    setZoom(1);
+    setCrop({ x: 0, y: 0 });
   }, []);
 
   // 파일 입력 변경 핸들러
@@ -105,14 +120,63 @@ export default function CreatePostModal({
     }
   };
 
+  // 크롭 완료 핸들러
+  const onCropComplete = useCallback((croppedArea: Area, croppedAreaPixels: Area) => {
+    setCroppedAreaPixels(croppedAreaPixels);
+  }, []);
+
+  // 크롭 적용 핸들러
+  const handleCropComplete = useCallback(async () => {
+    if (!previewUrl || !croppedAreaPixels || !originalFile) {
+      return;
+    }
+
+    try {
+      // 크롭된 이미지 생성
+      const croppedBlob = await getCroppedImg(
+        previewUrl,
+        croppedAreaPixels
+      );
+
+      // Blob을 File로 변환
+      const fileExtension = originalFile.name.split(".").pop() || "jpg";
+      const croppedFile = blobToFile(
+        croppedBlob,
+        `cropped.${fileExtension}`
+      );
+
+      // 크롭된 이미지 미리보기 URL 생성
+      const croppedUrl = URL.createObjectURL(croppedBlob);
+      setCroppedPreviewUrl(croppedUrl);
+
+      setSelectedFile(croppedFile);
+      setShowCrop(false);
+    } catch (err) {
+      console.error("Crop error:", err);
+      setError("이미지 크롭에 실패했습니다.");
+    }
+  }, [previewUrl, croppedAreaPixels, originalFile]);
+
+  // 크롭 취소 핸들러
+  const handleCropCancel = () => {
+    setShowCrop(false);
+    handleRemoveImage();
+  };
+
   // 이미지 제거
   const handleRemoveImage = () => {
     if (previewUrl) {
       URL.revokeObjectURL(previewUrl);
     }
+    if (croppedPreviewUrl) {
+      URL.revokeObjectURL(croppedPreviewUrl);
+    }
     setSelectedFile(null);
+    setOriginalFile(null);
     setPreviewUrl(null);
+    setCroppedPreviewUrl(null);
     setError(null);
+    setShowCrop(false);
     if (fileInputRef.current) {
       fileInputRef.current.value = "";
     }
@@ -139,8 +203,8 @@ export default function CreatePostModal({
       });
 
       if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.error || "게시물 업로드에 실패했습니다.");
+        const errorMessage = await extractErrorMessage(response);
+        throw new Error(errorMessage);
       }
 
       // 성공 시 상태 초기화
@@ -156,7 +220,8 @@ export default function CreatePostModal({
         onSuccess();
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : "게시물 업로드에 실패했습니다.");
+      const errorMessage = getUserFriendlyErrorMessage(err);
+      setError(errorMessage);
       console.error("Upload error:", err);
     } finally {
       setIsUploading(false);
@@ -216,29 +281,112 @@ export default function CreatePostModal({
                 컴퓨터에서 선택
               </Button>
             </div>
+          ) : showCrop ? (
+            /* 크롭 모드 */
+            <div className="space-y-4">
+              <div className="relative w-full aspect-square bg-gray-100 dark:bg-gray-800 rounded-lg overflow-hidden">
+                <Cropper
+                  image={previewUrl}
+                  crop={crop}
+                  zoom={zoom}
+                  aspect={1} // 1:1 정사각형
+                  onCropChange={setCrop}
+                  onZoomChange={setZoom}
+                  onCropComplete={onCropComplete}
+                  cropShape="rect"
+                  showGrid={true}
+                  style={{
+                    containerStyle: {
+                      width: "100%",
+                      height: "100%",
+                      position: "relative",
+                    },
+                  }}
+                />
+              </div>
+              {/* 줌 컨트롤 */}
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-[var(--instagram-text-primary)] dark:text-[var(--foreground)]">
+                  확대/축소
+                </label>
+                <input
+                  type="range"
+                  min={1}
+                  max={3}
+                  step={0.1}
+                  value={zoom}
+                  onChange={(e) => setZoom(Number(e.target.value))}
+                  className="w-full"
+                />
+              </div>
+              {/* 크롭 버튼 */}
+              <div className="flex justify-end gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={handleCropCancel}
+                >
+                  취소
+                </Button>
+                <Button
+                  type="button"
+                  onClick={handleCropComplete}
+                  className="bg-[var(--instagram-blue)] hover:bg-[var(--instagram-blue)]/90 text-white"
+                >
+                  <Check className="w-4 h-4 mr-2" />
+                  적용
+                </Button>
+              </div>
+            </div>
           ) : (
+            /* 크롭 완료 후 미리보기 */
             <div className="relative">
               <div className="relative w-full aspect-square bg-gray-100 dark:bg-gray-800 rounded-lg overflow-hidden">
                 <Image
-                  src={previewUrl}
+                  src={croppedPreviewUrl || previewUrl || ""}
                   alt="미리보기"
                   fill
                   className="object-contain"
                   sizes="(max-width: 768px) 100vw, 600px"
                 />
               </div>
-              <button
-                type="button"
-                onClick={handleRemoveImage}
-                className="absolute top-2 right-2 bg-black/50 hover:bg-black/70 text-white rounded-full p-2 transition-colors"
-                aria-label="이미지 제거"
-              >
-                <X className="w-4 h-4" />
-              </button>
+              <div className="absolute top-2 right-2 flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => setShowCrop(true)}
+                  className="bg-black/50 hover:bg-black/70 text-white rounded-full p-2 transition-colors"
+                  aria-label="이미지 크롭"
+                  title="크롭 수정"
+                >
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    className="w-4 h-4"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"
+                    />
+                  </svg>
+                </button>
+                <button
+                  type="button"
+                  onClick={handleRemoveImage}
+                  className="bg-black/50 hover:bg-black/70 text-white rounded-full p-2 transition-colors"
+                  aria-label="이미지 제거"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
             </div>
           )}
 
-          {/* 캡션 입력 */}
+          {/* 캡션 입력 (크롭 모드가 아닐 때만 표시) */}
+          {!showCrop && (
           <div className="space-y-2">
             <label
               htmlFor="caption"
@@ -259,6 +407,7 @@ export default function CreatePostModal({
               {caption.length}/{MAX_CAPTION_LENGTH}
             </div>
           </div>
+          )}
 
           {/* 에러 메시지 */}
           {error && (
@@ -267,7 +416,8 @@ export default function CreatePostModal({
             </div>
           )}
 
-          {/* 게시 버튼 */}
+          {/* 게시 버튼 (크롭 모드가 아닐 때만 표시) */}
+          {!showCrop && (
           <div className="flex justify-end gap-2 pt-4 border-t border-[var(--instagram-border)] dark:border-[var(--border)]">
             <Button
               type="button"
@@ -293,6 +443,7 @@ export default function CreatePostModal({
               )}
             </Button>
           </div>
+          )}
         </div>
       </DialogContent>
     </Dialog>

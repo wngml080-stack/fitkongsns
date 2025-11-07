@@ -2,13 +2,30 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { Heart, MessageCircle, Send, Bookmark, MoreHorizontal } from "lucide-react";
+import { Heart, MessageCircle, Send, Bookmark, MoreHorizontal, Trash2 } from "lucide-react";
 import { formatRelativeTime } from "@/lib/utils/format-time";
 import { useState, useEffect, useRef } from "react";
 import { useAuth } from "@clerk/nextjs";
 import { useClerkSupabaseClient } from "@/lib/supabase/clerk-client";
 import { SignInButton } from "@clerk/nextjs";
 import CommentForm from "@/components/comment/CommentForm";
+import PostModal from "./PostModal";
+import { getUserFriendlyErrorMessage, extractErrorMessage } from "@/lib/utils/error-handler";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
 
 /**
  * @file PostCard.tsx
@@ -59,9 +76,10 @@ interface Post {
 
 interface PostCardProps {
   post: Post;
+  onDelete?: (postId: string) => void; // 삭제 후 콜백
 }
 
-export default function PostCard({ post }: PostCardProps) {
+export default function PostCard({ post, onDelete }: PostCardProps) {
   const { isSignedIn, userId } = useAuth();
   const supabase = useClerkSupabaseClient();
   const [showFullCaption, setShowFullCaption] = useState(false);
@@ -72,8 +90,12 @@ export default function PostCard({ post }: PostCardProps) {
   const [isToggling, setIsToggling] = useState(false);
   const [comments, setComments] = useState<Comment[]>(post.comments);
   const [commentsCount, setCommentsCount] = useState(post.comments_count);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
   const lastTapRef = useRef<number>(0);
   const imageRef = useRef<HTMLDivElement>(null);
+  const clickTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   // 초기 좋아요 상태 확인
   useEffect(() => {
@@ -133,8 +155,8 @@ export default function PostCard({ post }: PostCardProps) {
       });
 
       if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.error || "좋아요 처리에 실패했습니다.");
+        const errorMessage = await extractErrorMessage(response);
+        throw new Error(errorMessage);
       }
 
       // 성공 시 애니메이션 종료
@@ -147,7 +169,8 @@ export default function PostCard({ post }: PostCardProps) {
       setLikesCount(previousCount);
       setIsAnimating(false);
       console.error("Like toggle error:", error);
-      alert(error instanceof Error ? error.message : "좋아요 처리에 실패했습니다.");
+      const errorMessage = getUserFriendlyErrorMessage(error);
+      alert(errorMessage);
     } finally {
       setIsToggling(false);
     }
@@ -155,31 +178,93 @@ export default function PostCard({ post }: PostCardProps) {
 
   // 더블탭 좋아요 (모바일)
   const handleDoubleTap = () => {
+    if (!isSignedIn || !userId) {
+      return; // 로그인하지 않은 사용자는 좋아요 불가
+    }
+
     const now = Date.now();
     const DOUBLE_TAP_DELAY = 300;
 
     if (now - lastTapRef.current < DOUBLE_TAP_DELAY) {
       // 더블탭 감지
-      if (!isLiked && isSignedIn) {
-        handleLikeToggle();
-        setShowDoubleTapHeart(true);
-        setTimeout(() => {
-          setShowDoubleTapHeart(false);
-        }, 1000);
+      // 싱글탭으로 인한 모달 열기 취소
+      if (clickTimeoutRef.current) {
+        clearTimeout(clickTimeoutRef.current);
+        clickTimeoutRef.current = null;
       }
+
+      if (!isLiked) {
+        handleLikeToggle();
+      }
+      setShowDoubleTapHeart(true);
+      setTimeout(() => {
+        setShowDoubleTapHeart(false);
+      }, 1000);
       lastTapRef.current = 0;
     } else {
       lastTapRef.current = now;
     }
   };
 
-  // 현재 사용자의 Supabase user_id 가져오기
+  // 이미지 싱글탭 핸들러
+  const handleImageClick = () => {
+    // 더블탭 체크를 위해 약간의 지연
+    clickTimeoutRef.current = setTimeout(() => {
+      const now = Date.now();
+      const timeSinceLastTap = now - lastTapRef.current;
+      // 더블탭이 아닌 경우에만 모달 열기 (300ms 이상 지난 경우)
+      if (timeSinceLastTap > 300 || lastTapRef.current === 0) {
+        setIsModalOpen(true);
+      }
+    }, 300);
+  };
+
+  // 게시물 삭제 핸들러
+  const handleDelete = async () => {
+    if (!isOwnPost || isDeleting) {
+      return;
+    }
+
+    setIsDeleting(true);
+
+    try {
+      const response = await fetch(`/api/posts/${post.id}`, {
+        method: "DELETE",
+      });
+
+      if (!response.ok) {
+        const errorMessage = await extractErrorMessage(response);
+        throw new Error(errorMessage);
+      }
+
+      // 삭제 성공
+      setIsDeleteDialogOpen(false);
+      
+      // 콜백 호출 (피드에서 게시물 제거)
+      if (onDelete) {
+        onDelete(post.id);
+      } else {
+        // 콜백이 없으면 페이지 새로고침
+        window.location.reload();
+      }
+    } catch (error) {
+      console.error("Error deleting post:", error);
+      const errorMessage = getUserFriendlyErrorMessage(error);
+      alert(errorMessage);
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
+  // 현재 사용자의 Supabase user_id 가져오기 및 본인 게시물 확인
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+  const [isOwnPost, setIsOwnPost] = useState(false);
 
   useEffect(() => {
-    const fetchCurrentUserId = async () => {
+    const fetchCurrentUserIdAndCheckOwnership = async () => {
       if (!isSignedIn || !userId) {
         setCurrentUserId(null);
+        setIsOwnPost(false);
         return;
       }
 
@@ -190,15 +275,22 @@ export default function PostCard({ post }: PostCardProps) {
           .eq("clerk_id", userId)
           .single();
 
-        setCurrentUserId(userData?.id || null);
+        if (userData) {
+          setCurrentUserId(userData.id);
+          setIsOwnPost(userData.id === post.user_id);
+        } else {
+          setCurrentUserId(null);
+          setIsOwnPost(false);
+        }
       } catch (error) {
         console.error("Error fetching current user ID:", error);
         setCurrentUserId(null);
+        setIsOwnPost(false);
       }
     };
 
-    fetchCurrentUserId();
-  }, [isSignedIn, userId, supabase]);
+    fetchCurrentUserIdAndCheckOwnership();
+  }, [isSignedIn, userId, post.user_id, supabase]);
 
   // 댓글 삭제 핸들러
   const handleDeleteComment = async (commentId: string) => {
@@ -212,15 +304,16 @@ export default function PostCard({ post }: PostCardProps) {
       });
 
       if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.error || "댓글 삭제에 실패했습니다.");
+        const errorMessage = await extractErrorMessage(response);
+        throw new Error(errorMessage);
       }
 
       // 댓글 목록 새로고침
       await refreshComments();
     } catch (error) {
       console.error("Error deleting comment:", error);
-      alert(error instanceof Error ? error.message : "댓글 삭제에 실패했습니다.");
+      const errorMessage = getUserFriendlyErrorMessage(error);
+      alert(errorMessage);
     }
   };
 
@@ -291,7 +384,7 @@ export default function PostCard({ post }: PostCardProps) {
   const profileImageUrl = post.user.image_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${post.user.clerk_id}`;
 
   return (
-    <article className="bg-white dark:bg-[var(--card)] border border-[var(--instagram-border)] dark:border-[var(--border)] rounded-sm mb-4">
+    <article className="bg-white dark:bg-[var(--card)] border-x-0 md:border-x border-t border-b border-[var(--instagram-border)] dark:border-[var(--border)] rounded-none md:rounded-sm mb-0 md:mb-4">
       {/* 헤더 */}
       <header className="h-[60px] flex items-center justify-between px-4 border-b border-[var(--instagram-border)] dark:border-[var(--border)]">
         <div className="flex items-center gap-3">
@@ -316,12 +409,36 @@ export default function PostCard({ post }: PostCardProps) {
             </span>
           </div>
         </div>
-        <button
-          className="text-[var(--instagram-text-primary)] dark:text-[var(--foreground)] hover:opacity-70"
-          aria-label="더보기 메뉴"
-        >
-          <MoreHorizontal className="w-5 h-5" />
-        </button>
+        {isOwnPost ? (
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <button
+                className="text-[var(--instagram-text-primary)] dark:text-[var(--foreground)] hover:opacity-70"
+                aria-label="더보기 메뉴"
+              >
+                <MoreHorizontal className="w-5 h-5" />
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem
+                variant="destructive"
+                onClick={() => setIsDeleteDialogOpen(true)}
+                className="cursor-pointer"
+              >
+                <Trash2 className="w-4 h-4" />
+                삭제
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        ) : (
+          <button
+            className="text-[var(--instagram-text-primary)] dark:text-[var(--foreground)] hover:opacity-70 opacity-0"
+            aria-label="더보기 메뉴"
+            disabled
+          >
+            <MoreHorizontal className="w-5 h-5" />
+          </button>
+        )}
       </header>
 
       {/* 이미지 영역 */}
@@ -329,6 +446,7 @@ export default function PostCard({ post }: PostCardProps) {
         ref={imageRef}
         className="relative w-full aspect-square bg-gray-100 cursor-pointer select-none"
         onDoubleClick={handleDoubleTap}
+        onClick={handleImageClick}
       >
         <Image
           src={post.image_url}
@@ -342,9 +460,9 @@ export default function PostCard({ post }: PostCardProps) {
         {showDoubleTapHeart && (
           <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-10">
             <Heart
-              className="w-24 h-24 text-[var(--instagram-like)] fill-current"
+              className="w-20 h-20 md:w-24 md:h-24 text-[var(--instagram-like)] fill-current drop-shadow-lg"
               style={{
-                animation: "doubleTapHeart 1s ease-out",
+                animation: "doubleTapHeart 1s cubic-bezier(0.34, 1.56, 0.64, 1)",
               }}
             />
           </div>
@@ -359,11 +477,11 @@ export default function PostCard({ post }: PostCardProps) {
               onClick={handleLikeToggle}
               disabled={isToggling}
               className={`
-                transition-all duration-150
-                hover:scale-110
-                ${isAnimating ? "scale-[1.3]" : ""}
-                ${isLiked ? "text-[var(--instagram-like)]" : "text-[var(--instagram-text-primary)]"}
-                disabled:opacity-50
+                transition-all duration-150 ease-out
+                hover:scale-110 active:scale-95
+                ${isAnimating ? "animate-like-pulse" : ""}
+                ${isLiked ? "text-[var(--instagram-like)]" : "text-[var(--instagram-text-primary)] dark:text-[var(--foreground)]"}
+                disabled:opacity-50 disabled:cursor-not-allowed
               `}
               aria-label={isLiked ? "좋아요 취소" : "좋아요"}
             >
@@ -382,6 +500,7 @@ export default function PostCard({ post }: PostCardProps) {
             </SignInButton>
           )}
           <button
+            onClick={() => setIsModalOpen(true)}
             className="text-[var(--instagram-text-primary)] dark:text-[var(--foreground)] transition-transform hover:scale-110"
             aria-label="댓글"
           >
@@ -436,7 +555,10 @@ export default function PostCard({ post }: PostCardProps) {
         {commentsCount > 0 && (
           <div className="space-y-1">
             {commentsCount > 2 && (
-              <button className="text-sm text-[var(--instagram-text-secondary)] dark:text-[var(--muted-foreground)] hover:text-[var(--instagram-text-primary)] dark:hover:text-[var(--foreground)]">
+              <button
+                onClick={() => setIsModalOpen(true)}
+                className="text-sm text-[var(--instagram-text-secondary)] dark:text-[var(--muted-foreground)] hover:text-[var(--instagram-text-primary)] dark:hover:text-[var(--foreground)]"
+              >
                 댓글 {commentsCount}개 모두 보기
               </button>
             )}
@@ -474,6 +596,41 @@ export default function PostCard({ post }: PostCardProps) {
 
       {/* 댓글 작성 폼 */}
       <CommentForm postId={post.id} onSuccess={refreshComments} />
+
+      {/* 게시물 상세 모달 */}
+      <PostModal
+        postId={post.id}
+        open={isModalOpen}
+        onOpenChange={setIsModalOpen}
+      />
+
+      {/* 삭제 확인 다이얼로그 */}
+      <Dialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>게시물 삭제</DialogTitle>
+            <DialogDescription>
+              정말로 이 게시물을 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setIsDeleteDialogOpen(false)}
+              disabled={isDeleting}
+            >
+              취소
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={handleDelete}
+              disabled={isDeleting}
+            >
+              {isDeleting ? "삭제 중..." : "삭제"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </article>
   );
 }

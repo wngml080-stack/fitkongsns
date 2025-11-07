@@ -10,46 +10,46 @@
 
 export default function PostCardSkeleton() {
   return (
-    <article className="bg-white border border-[var(--instagram-border)] rounded-sm mb-4 animate-pulse">
+    <article className="bg-white dark:bg-[var(--card)] border border-[var(--instagram-border)] dark:border-[var(--border)] rounded-sm mb-4 animate-pulse">
       {/* 헤더 Skeleton */}
-      <header className="h-[60px] flex items-center justify-between px-4 border-b border-[var(--instagram-border)]">
+      <header className="h-[60px] flex items-center justify-between px-4 border-b border-[var(--instagram-border)] dark:border-[var(--border)]">
         <div className="flex items-center gap-3">
-          <div className="w-8 h-8 rounded-full bg-gray-200" />
+          <div className="w-8 h-8 rounded-full bg-gray-200 dark:bg-gray-700" />
           <div className="space-y-2">
-            <div className="h-4 w-20 bg-gray-200 rounded" />
-            <div className="h-3 w-16 bg-gray-200 rounded" />
+            <div className="h-4 w-20 bg-gray-200 dark:bg-gray-700 rounded" />
+            <div className="h-3 w-16 bg-gray-200 dark:bg-gray-700 rounded" />
           </div>
         </div>
-        <div className="w-5 h-5 bg-gray-200 rounded" />
+        <div className="w-5 h-5 bg-gray-200 dark:bg-gray-700 rounded" />
       </header>
 
       {/* 이미지 영역 Skeleton */}
-      <div className="relative w-full aspect-square bg-gray-200">
+      <div className="relative w-full aspect-square bg-gray-200 dark:bg-gray-700 overflow-hidden">
         {/* Shimmer 효과 */}
-        <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent animate-shimmer" />
+        <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 dark:via-white/10 to-transparent animate-shimmer" />
       </div>
 
       {/* 액션 버튼 Skeleton */}
       <div className="h-[48px] flex items-center justify-between px-4">
         <div className="flex items-center gap-4">
-          <div className="w-6 h-6 bg-gray-200 rounded" />
-          <div className="w-6 h-6 bg-gray-200 rounded" />
-          <div className="w-6 h-6 bg-gray-200 rounded" />
+          <div className="w-6 h-6 bg-gray-200 dark:bg-gray-700 rounded" />
+          <div className="w-6 h-6 bg-gray-200 dark:bg-gray-700 rounded" />
+          <div className="w-6 h-6 bg-gray-200 dark:bg-gray-700 rounded" />
         </div>
-        <div className="w-6 h-6 bg-gray-200 rounded" />
+        <div className="w-6 h-6 bg-gray-200 dark:bg-gray-700 rounded" />
       </div>
 
       {/* 컨텐츠 Skeleton */}
       <div className="px-4 pb-4 space-y-3">
-        <div className="h-4 w-24 bg-gray-200 rounded" />
+        <div className="h-4 w-24 bg-gray-200 dark:bg-gray-700 rounded" />
         <div className="space-y-2">
-          <div className="h-4 w-full bg-gray-200 rounded" />
-          <div className="h-4 w-3/4 bg-gray-200 rounded" />
+          <div className="h-4 w-full bg-gray-200 dark:bg-gray-700 rounded" />
+          <div className="h-4 w-3/4 bg-gray-200 dark:bg-gray-700 rounded" />
         </div>
         <div className="space-y-2">
-          <div className="h-3 w-32 bg-gray-200 rounded" />
-          <div className="h-3 w-full bg-gray-200 rounded" />
-          <div className="h-3 w-4/5 bg-gray-200 rounded" />
+          <div className="h-3 w-32 bg-gray-200 dark:bg-gray-700 rounded" />
+          <div className="h-3 w-full bg-gray-200 dark:bg-gray-700 rounded" />
+          <div className="h-3 w-4/5 bg-gray-200 dark:bg-gray-700 rounded" />
         </div>
       </div>
     </article>

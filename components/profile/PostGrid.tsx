@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { Heart, MessageCircle } from "lucide-react";
+import { getUserFriendlyErrorMessage, extractErrorMessage } from "@/lib/utils/error-handler";
 
 /**
  * @file PostGrid.tsx
@@ -53,8 +54,8 @@ export default function PostGrid({ userId }: PostGridProps) {
       );
 
       if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.error || "게시물을 불러오는데 실패했습니다.");
+        const errorMessage = await extractErrorMessage(response);
+        throw new Error(errorMessage);
       }
 
       const data = await response.json();
@@ -68,7 +69,8 @@ export default function PostGrid({ userId }: PostGridProps) {
       setHasMore(data.hasMore);
       setPage(data.page);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "알 수 없는 오류가 발생했습니다.");
+      const errorMessage = getUserFriendlyErrorMessage(err);
+      setError(errorMessage);
       console.error("Error fetching posts:", err);
     } finally {
       setLoading(false);

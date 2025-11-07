@@ -103,6 +103,10 @@
   - [x] 액션 버튼 (❤️ 좋아요, 💬 댓글, ✈️ 공유, 🔖 북마크)
   - [x] 컨텐츠 (좋아요 수, 캡션, 댓글 미리보기 2개)
   - [x] 캡션 2줄 초과 시 "... 더 보기" 처리
+  - [x] 게시물 삭제 기능 (본인 게시물만) - OS
+    - [x] DropdownMenu로 삭제 옵션 표시
+    - [x] 삭제 확인 다이얼로그
+    - [x] 삭제 후 피드에서 즉시 제거
 - [x] `components/post/PostCardSkeleton.tsx` 로딩 UI
   - [x] Skeleton UI (회색 박스 애니메이션)
   - [x] Shimmer 효과
@@ -117,6 +121,7 @@
   - [x] 페이지네이션 (10개씩)
   - [x] 시간 역순 정렬
   - [x] 사용자 정보 포함
+  - [x] userId 쿼리 파라미터 지원 (프로필 페이지용) - OS
 
 ### 1-4. 홈 피드 - 좋아요 기능
 - [x] `likes` 테이블 생성 (이미 완료)
@@ -198,76 +203,106 @@
 ## 3. 프로필 페이지 & 팔로우 기능
 
 ### 3-1. 프로필 페이지 - 기본 정보
-- [ ] `app/(main)/profile/[userId]/page.tsx` 동적 라우트
-- [ ] `components/profile/ProfileHeader.tsx` 컴포넌트
-  - [ ] 프로필 이미지 (Desktop 150px / Mobile 90px)
-  - [ ] 사용자명
-  - [ ] 통계 (게시물 수, 팔로워 수, 팔로잉 수)
-  - [ ] "팔로우" 또는 "팔로잉" 버튼
-  - [ ] 본인 프로필: "프로필 편집" 버튼 (1차 제외)
-- [ ] `app/api/users/[userId]/route.ts` GET API
-  - [ ] 사용자 정보 조회
-  - [ ] 통계 정보 포함 (user_stats 뷰 활용)
+- [x] `app/(main)/profile/[userId]/page.tsx` 동적 라우트
+- [x] `components/profile/ProfileHeader.tsx` 컴포넌트
+  - [x] 프로필 이미지 (Desktop 150px / Mobile 90px)
+  - [x] 사용자명
+  - [x] 통계 (게시물 수, 팔로워 수, 팔로잉 수)
+  - [x] "팔로우" 또는 "팔로잉" 버튼
+  - [x] 본인 프로필: "프로필 편집" 버튼 (1차 제외)
+  - [x] 로딩 상태 Skeleton UI - OS
+  - [x] 에러 처리 및 재시도 버튼 - OS
+  - [x] Clerk 프로필 이미지 연동 - OS
+- [x] `app/api/users/[userId]/route.ts` GET API
+  - [x] 사용자 정보 조회
+  - [x] 통계 정보 포함 (user_stats 뷰 활용)
+  - [x] Clerk 프로필 이미지 가져오기 - OS
+  - [x] 팔로우 상태 확인 - OS
 
 ### 3-2. 프로필 페이지 - 게시물 그리드
-- [ ] `components/profile/PostGrid.tsx` 컴포넌트
-  - [ ] 3열 그리드 레이아웃 (반응형)
-  - [ ] 1:1 정사각형 이미지
-  - [ ] Hover 시 좋아요/댓글 수 표시
-  - [ ] 클릭 시 상세 모달/페이지 이동
-- [ ] `app/api/posts/route.ts` 수정
-  - [ ] userId 쿼리 파라미터 추가
-  - [ ] 특정 사용자 게시물만 필터링
-- [ ] 게시물 이미지 썸네일 표시
+- [x] `components/profile/PostGrid.tsx` 컴포넌트
+  - [x] 3열 그리드 레이아웃 (반응형)
+  - [x] 1:1 정사각형 이미지
+  - [x] Hover 시 좋아요/댓글 수 표시
+  - [x] 클릭 시 상세 모달/페이지 이동
+  - [x] "더 보기" 버튼 (게시물이 많을 경우) - OS
+  - [x] 로딩 상태 Skeleton UI - OS
+- [x] `app/api/posts/route.ts` 수정
+  - [x] userId 쿼리 파라미터 추가
+  - [x] 특정 사용자 게시물만 필터링
+- [x] 게시물 이미지 썸네일 표시
 
 ### 3-3. 팔로우 기능
 - [x] `follows` 테이블 생성 (이미 완료)
-- [ ] `app/api/follows/route.ts` API
-  - [ ] POST: 팔로우 추가
-  - [ ] DELETE: 팔로우 제거
-- [ ] 팔로우/언팔로우 버튼
-  - [ ] 미팔로우: "팔로우" (파란색 #0095f6)
-  - [ ] 팔로우 중: "팔로잉" (회색)
-  - [ ] Hover: "언팔로우" (빨간 테두리)
-  - [ ] 클릭 시 즉시 API 호출 → UI 업데이트
-- [ ] 팔로워/팔로잉 수 실시간 업데이트
+- [x] `app/api/follows/route.ts` API
+  - [x] POST: 팔로우 추가
+  - [x] DELETE: 팔로우 제거
+  - [x] 자기 자신 팔로우 방지 - OS
+  - [x] 중복 팔로우 방지 (UNIQUE 제약 처리) - OS
+- [x] 팔로우/언팔로우 버튼
+  - [x] 미팔로우: "팔로우" (파란색 #0095f6)
+  - [x] 팔로우 중: "팔로잉" (회색)
+  - [x] Hover: "언팔로우" (빨간 테두리)
+  - [x] 클릭 시 즉시 API 호출 → UI 업데이트
+  - [x] 로그인하지 않은 사용자: SignInButton으로 감싸기 - OS
+  - [x] 로딩 상태 표시 (버튼 비활성화) - OS
+  - [x] 낙관적 업데이트 및 에러 시 롤백 - OS
+- [x] 팔로워/팔로잉 수 실시간 업데이트
 
 ### 3-4. 게시물 상세 모달 (Desktop)
-- [ ] `components/post/PostModal.tsx` 컴포넌트
-  - [ ] Desktop: 모달 형식 (이미지 50% + 댓글 50%)
-  - [ ] Mobile: 전체 페이지로 전환
-  - [ ] 이미지 영역
-  - [ ] 댓글 목록 (스크롤 가능)
-  - [ ] 좋아요/댓글 액션 버튼
-  - [ ] 댓글 작성 폼
-- [ ] PostCard 클릭 시 모달/페이지 열기
+- [x] `components/post/PostModal.tsx` 컴포넌트
+  - [x] Desktop: 모달 형식 (이미지 50% + 댓글 50%)
+  - [x] Mobile: 전체화면 모달
+  - [x] 이미지 영역
+  - [x] 댓글 목록 (스크롤 가능)
+  - [x] 좋아요/댓글 액션 버튼
+  - [x] 댓글 작성 폼
+  - [x] 댓글 삭제 기능 (본인만) - OS
+  - [x] 로딩 상태 및 에러 처리 - OS
+- [x] PostCard 클릭 시 모달 열기
+  - [x] 이미지 클릭 시 모달 열기
+  - [x] 댓글 버튼 클릭 시 모달 열기
+  - [x] "댓글 모두 보기" 클릭 시 모달 열기
+  - [x] 더블탭과 싱글탭 구분 (더블탭: 좋아요, 싱글탭: 모달) - OS
+- [x] `app/api/posts/[postId]/route.ts` GET API
+  - [x] 단일 게시물 상세 조회
+  - [x] 전체 댓글 목록 포함
+  - [x] 좋아요 상태 확인
+- [x] `app/api/posts/[postId]/route.ts` DELETE API - OS
+  - [x] 게시물 삭제 (본인만 가능)
+  - [x] Storage에서 이미지 파일 삭제
+  - [x] 소유권 검증
 
 ## 4. 최종 마무리 & 배포
 
 ### 4-1. 반응형 테스트
-- [ ] 모바일 (< 768px) 테스트
-  - [ ] Header/BottomNav 동작 확인
-  - [ ] PostCard 전체 너비 확인
-  - [ ] 더블탭 좋아요 동작 확인
-- [ ] 태블릿 (768px ~ 1024px) 테스트
-  - [ ] Icon-only Sidebar 동작 확인
-  - [ ] PostCard 최대 너비 확인
-- [ ] Desktop (1024px+) 테스트
-  - [ ] Full Sidebar 동작 확인
-  - [ ] PostCard 중앙 정렬 확인
+- [x] 모바일 (< 768px) 테스트 - OS
+  - [x] Header/BottomNav 동작 확인
+  - [x] PostCard 전체 너비 확인 (모바일: border-x-0, 데스크톱: border-x)
+  - [x] 더블탭 좋아요 동작 확인
+  - [x] 홈 피드 페이지 반응형 패딩 개선 (모바일: px-0, 데스크톱: px-4)
+- [x] 태블릿 (768px ~ 1024px) 테스트 - OS
+  - [x] Icon-only Sidebar 동작 확인
+  - [x] PostCard 최대 너비 확인
+- [x] Desktop (1024px+) 테스트 - OS
+  - [x] Full Sidebar 동작 확인
+  - [x] PostCard 중앙 정렬 확인
 
 ### 4-2. 에러 핸들링 & UI 개선
-- [ ] 에러 핸들링
-  - [ ] API 에러 처리
-  - [ ] 사용자 친화적 에러 메시지
-  - [ ] 네트워크 에러 처리
-- [ ] Skeleton UI 개선
-  - [ ] 모든 로딩 상태에 Skeleton 적용
-  - [ ] Shimmer 효과 일관성
-- [ ] 애니메이션 최적화
-  - [ ] 좋아요 애니메이션
-  - [ ] 더블탭 하트 애니메이션
-  - [ ] 모달 열기/닫기 애니메이션
+- [x] 에러 핸들링 - OS
+  - [x] API 에러 처리 (`lib/utils/error-handler.ts` 유틸리티 생성)
+  - [x] 사용자 친화적 에러 메시지 (HTTP 상태 코드별 메시지)
+  - [x] 네트워크 에러 처리 (네트워크 에러 감지 및 메시지)
+  - [x] 모든 컴포넌트에 에러 핸들링 적용 (PostFeed, PostCard, PostModal, CreatePostModal, ProfileHeader, PostGrid, CommentForm)
+- [x] Skeleton UI 개선 - OS
+  - [x] PostCardSkeleton 다크모드 스타일 추가
+  - [x] Shimmer 효과 일관성 개선 (다크모드 대응)
+  - [x] 모든 로딩 상태에 Skeleton 적용 (이미 완료)
+- [x] 애니메이션 최적화 - OS
+  - [x] 좋아요 애니메이션 (`animate-like-pulse` 추가, ease-out 적용)
+  - [x] 더블탭 하트 애니메이션 (회전 효과 추가, cubic-bezier 적용, 반응형 크기)
+  - [x] 모달 열기/닫기 애니메이션 (duration-300 추가)
+  - [x] 버튼 hover/active 효과 개선 (active:scale-95 추가)
 
 ### 4-3. 배포
 - [ ] Vercel 배포

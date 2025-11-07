@@ -15,8 +15,8 @@ import PostFeed from "@/components/post/PostFeed";
 
 export default function HomePage() {
   return (
-    <div className="min-h-screen bg-[var(--instagram-background)] py-8">
-      <div className="max-w-[630px] mx-auto px-4">
+    <div className="min-h-screen bg-[var(--instagram-background)] dark:bg-[var(--background)] py-4 md:py-8">
+      <div className="max-w-[630px] mx-auto px-0 md:px-4">
         <PostFeed />
       </div>
     </div>

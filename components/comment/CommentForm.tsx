@@ -6,6 +6,7 @@ import { SignInButton } from "@clerk/nextjs";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Loader2 } from "lucide-react";
+import { getUserFriendlyErrorMessage, extractErrorMessage } from "@/lib/utils/error-handler";
 
 /**
  * @file CommentForm.tsx
@@ -63,8 +64,8 @@ export default function CommentForm({ postId, onSuccess }: CommentFormProps) {
       });
 
       if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.error || "댓글 작성에 실패했습니다.");
+        const errorMessage = await extractErrorMessage(response);
+        throw new Error(errorMessage);
       }
 
       // 성공 시 입력 필드 초기화
@@ -76,7 +77,8 @@ export default function CommentForm({ postId, onSuccess }: CommentFormProps) {
         onSuccess();
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : "댓글 작성에 실패했습니다.");
+      const errorMessage = getUserFriendlyErrorMessage(err);
+      setError(errorMessage);
       console.error("Comment submit error:", err);
     } finally {
       setIsSubmitting(false);
