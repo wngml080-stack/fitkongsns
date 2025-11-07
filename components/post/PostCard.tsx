@@ -483,6 +483,11 @@ export default function PostCard({ post, onDelete }: PostCardProps) {
           className="object-cover"
           sizes="(max-width: 768px) 100vw, 630px"
           draggable={false}
+          onError={(e) => {
+            console.error("[PostCard] Image load error:", post.image_url);
+            // 이미지 로드 실패 시 기본 이미지로 대체하거나 에러 처리
+          }}
+          unoptimized={post.image_url.includes("supabase.co/storage")}
         />
         {/* 더블탭 하트 애니메이션 */}
         {showDoubleTapHeart && (

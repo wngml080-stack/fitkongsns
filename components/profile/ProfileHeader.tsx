@@ -199,6 +199,10 @@ export default function ProfileHeader({ userId }: ProfileHeaderProps) {
                 width={150}
                 height={150}
                 className="w-[90px] h-[90px] md:w-[150px] md:h-[150px] rounded-full object-cover"
+                onError={(e) => {
+                  console.error("[ProfileHeader] Image load error:", profileImageUrl);
+                }}
+                unoptimized={profileImageUrl.includes("supabase.co/storage") || isSvg}
               />
             )}
           </div>

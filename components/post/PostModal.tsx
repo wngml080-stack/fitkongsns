@@ -354,6 +354,10 @@ export default function PostModal({
                 fill
                 className="object-contain"
                 sizes="(max-width: 768px) 100vw, 50vw"
+                onError={(e) => {
+                  console.error("[PostModal] Image load error:", post.image_url);
+                }}
+                unoptimized={post.image_url.includes("supabase.co/storage")}
               />
             </div>
 
