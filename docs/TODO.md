@@ -2,42 +2,72 @@
 
 ## 프로젝트 초기 세팅
 
-- [ ] `.cursor/` 디렉토리
-  - [ ] `rules/` 커서룰
-  - [ ] `mcp.json` MCP 서버 설정
-  - [ ] `dir.md` 프로젝트 디렉토리 구조
-- [ ] `.github/` 디렉토리
+- [x] `.cursor/` 디렉토리
+  - [x] `rules/` 커서룰
+  - [x] `mcp.json` MCP 서버 설정
+  - [x] `dir.md` 프로젝트 디렉토리 구조 (docs/DIR.md)
+- [ ] `.github/` 디렉토리 (비어있음)
 - [ ] `.husky/` 디렉토리
 - [ ] `app/` 디렉토리
-  - [ ] `favicon.ico` 파일
+  - [x] `favicon.ico` 파일
   - [ ] `not-found.tsx` 파일
   - [ ] `robots.ts` 파일
   - [ ] `sitemap.ts` 파일
   - [ ] `manifest.ts` 파일
-- [ ] `supabase/` 디렉토리
-- [ ] `public/` 디렉토리
-  - [ ] `icons/` 디렉토리
-  - [ ] `logo.png` 파일
-  - [ ] `og-image.png` 파일
-- [ ] `tsconfig.json` 파일
-- [ ] `.cursorignore` 파일
-- [ ] `.gitignore` 파일
-- [ ] `.prettierignore` 파일
-- [ ] `.prettierrc` 파일
-- [ ] `eslint.config.mjs` 파일
-- [ ] `AGENTS.md` 파일
+- [x] `supabase/` 디렉토리
+  - [x] `supabase/config.toml` Supabase 프로젝트 설정
+  - [x] `supabase/migrations/` 마이그레이션 파일들
+    - [x] `setup_schema.sql` (테이블, 뷰, 트리거 생성)
+    - [x] `setup_storage.sql` (Storage 버킷 및 RLS 정책)
+- [x] `public/` 디렉토리
+  - [x] `icons/` 디렉토리
+  - [x] `logo.png` 파일
+  - [x] `og-image.png` 파일
+- [x] `tsconfig.json` 파일
+- [x] `.cursorignore` 파일
+- [x] `.gitignore` 파일
+- [x] `.prettierignore` 파일
+- [x] `.prettierrc` 파일
+- [x] `eslint.config.mjs` 파일
+- [x] `AGENTS.md` 파일
+- [x] `README.md` 파일 (프로젝트 문서화)
 
 ## 1. 홈 피드 페이지
 
 ### 1-1. 기본 세팅
 - [x] Next.js + TypeScript 프로젝트 생성
-- [ ] Tailwind CSS 설정 (인스타 컬러 스키마)
-  - [ ] `globals.css`에 Instagram 컬러 변수 추가
+- [x] Tailwind CSS 설정 (인스타 컬러 스키마)
+  - [x] `globals.css` 파일 존재 (Instagram 컬러 변수 추가 필요)
   - [ ] 타이포그래피 설정
 - [x] Clerk 인증 연동 (한국어 설정)
+  - [x] `middleware.ts` Clerk 미들웨어 설정
+  - [x] `app/layout.tsx` ClerkProvider 통합
 - [x] Supabase 프로젝트 생성 및 연동
+  - [x] `lib/supabase/clerk-client.ts` (Client Component용)
+  - [x] `lib/supabase/server.ts` (Server Component용)
+  - [x] `lib/supabase/service-role.ts` (관리자 권한용)
+  - [x] `lib/supabase/client.ts` (공개 데이터용)
 - [x] 기본 데이터베이스 테이블 (users, posts, likes, comments, follows)
+- [x] 데이터베이스 뷰 (Views)
+  - [x] `post_stats` 뷰 (게시물 통계: 좋아요 수, 댓글 수)
+  - [x] `user_stats` 뷰 (사용자 통계: 게시물 수, 팔로워 수, 팔로잉 수)
+- [x] 데이터베이스 트리거 (Triggers)
+  - [x] `handle_updated_at()` 함수 (updated_at 자동 업데이트)
+  - [x] posts, comments 테이블에 트리거 적용
 - [x] Supabase Storage 버킷 생성 (uploads)
+  - [x] Storage RLS 정책 설정 (INSERT, SELECT, DELETE, UPDATE)
+- [x] Clerk ↔ Supabase 사용자 동기화
+  - [x] `hooks/use-sync-user.ts` 동기화 훅
+  - [x] `components/providers/sync-user-provider.tsx` 프로바이더
+  - [x] `app/api/sync-user/route.ts` 동기화 API
+- [x] shadcn/ui 컴포넌트 설정
+  - [x] `components.json` 설정 파일
+  - [x] 기본 UI 컴포넌트 (button, dialog, form, input, label, textarea, accordion)
+- [x] 테스트 페이지
+  - [x] `app/auth-test/page.tsx` (Clerk + Supabase 인증 테스트)
+  - [x] `app/storage-test/page.tsx` (Supabase Storage 테스트)
+- [x] 기본 컴포넌트
+  - [x] `components/Navbar.tsx` 네비게이션 바
 
 ### 1-2. 레이아웃 구조
 - [ ] `components/layout/Sidebar.tsx` 컴포넌트
