@@ -144,17 +144,32 @@ export default function EditProfileModal({
       return;
     }
 
+    // 이름 검증 (클라이언트 측)
+    const trimmedName = name.trim();
+    if (trimmedName.length === 0) {
+      setError("이름은 비어있을 수 없습니다.");
+      return;
+    }
+
     setIsUploading(true);
     setError(null);
 
     try {
       const formData = new FormData();
-      formData.append("name", name);
+      // 공백 제거된 이름 전달
+      formData.append("name", trimmedName);
       if (selectedFile) {
         formData.append("image", selectedFile);
       }
       formData.append("bio", bio);
       formData.append("website", website);
+
+      console.log("[EditProfileModal] Submitting profile update:", {
+        name: trimmedName,
+        hasImage: !!selectedFile,
+        bio,
+        website,
+      });
 
       const response = await fetch(`/api/users/${userId}`, {
         method: "PUT",

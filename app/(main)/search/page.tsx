@@ -39,7 +39,8 @@ export default function SearchPage() {
         setLoadingSuggestions(true);
         setSuggestionError(null);
 
-        const type = query.trim().startsWith("#") ? "hashtag" : "all";
+        // #로 시작하더라도 해시태그와 사용자 모두 검색
+        const type = "all";
         const response = await fetch(
           `/api/search?q=${encodeURIComponent(query.trim())}&type=${type}`,
           { signal: controller.signal }
@@ -93,7 +94,8 @@ export default function SearchPage() {
     setSelectedHashtag(tag.toLowerCase());
   };
 
-  const showUserResults = query.trim().length > 0 && !query.trim().startsWith("#");
+  // 해시태그로 시작하더라도 사용자 검색 결과 표시
+  const showUserResults = query.trim().length > 0 && userSuggestions.length > 0;
 
   return (
     <div className="min-h-screen bg-[var(--instagram-background)] dark:bg-[var(--background)]">

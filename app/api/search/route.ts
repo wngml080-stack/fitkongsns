@@ -24,6 +24,8 @@ export async function GET(request: NextRequest) {
   const supabase = createClient(supabaseUrl, supabaseKey);
 
   const normalizedHashtagQuery = rawQuery.replace(/^#+/, "").toLowerCase();
+  // 사용자 검색을 위한 쿼리 (해시태그 기호 제거)
+  const userSearchQuery = rawQuery.replace(/^#+/, "").trim();
   const responsePayload: {
     hashtags: Array<{ id: string; tag: string; posts_count: number }>;
     users: Array<{ id: string; clerk_id: string; name: string }>;
@@ -52,11 +54,12 @@ export async function GET(request: NextRequest) {
     }
   }
 
-  if (shouldSearchUsers) {
+  // 사용자 검색: 해시태그로 시작하더라도 해시태그 기호를 제거한 후 검색
+  if (shouldSearchUsers && userSearchQuery.length > 0) {
     const { data: usersData, error: usersError } = await supabase
       .from("users")
       .select("id, clerk_id, name")
-      .ilike("name", `%${rawQuery}%`)
+      .ilike("name", `%${userSearchQuery}%`)
       .order("name")
       .limit(10);
 

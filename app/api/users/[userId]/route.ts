@@ -160,24 +160,27 @@ export async function PUT(
 
     const supabase = getServiceRoleClient();
     const formData = await request.formData();
-    const name = formData.get("name") as string | null;
+    const nameInput = formData.get("name") as string | null;
     const imageFile = formData.get("image") as File | null;
     const bioInput = formData.get("bio") as string | null;
     const websiteInput = formData.get("website") as string | null;
 
-    // 이름 검증
-    if (name && name.trim().length === 0) {
-      return NextResponse.json(
-        { error: "이름은 비어있을 수 없습니다." },
-        { status: 400 }
-      );
-    }
-
-    if (name && name.length > 50) {
-      return NextResponse.json(
-        { error: "이름은 50자를 초과할 수 없습니다." },
-        { status: 400 }
-      );
+    // 이름 처리 및 검증
+    let trimmedName: string | null = null;
+    if (nameInput !== null) {
+      trimmedName = nameInput.trim();
+      if (trimmedName.length === 0) {
+        return NextResponse.json(
+          { error: "이름은 비어있을 수 없습니다." },
+          { status: 400 }
+        );
+      }
+      if (trimmedName.length > 50) {
+        return NextResponse.json(
+          { error: "이름은 50자를 초과할 수 없습니다." },
+          { status: 400 }
+        );
+      }
     }
 
     // 이미지 파일 검증
@@ -247,18 +250,23 @@ export async function PUT(
     // Clerk 사용자 정보 업데이트
     try {
       const clerkClientInstance = await clerkClient();
-      const updateData: { firstName?: string; imageUrl?: string } = {};
+      const clerkUpdateData: { firstName?: string; imageUrl?: string } = {};
       
-      if (name) {
-        updateData.firstName = name;
+      if (trimmedName) {
+        clerkUpdateData.firstName = trimmedName;
       }
       
       if (imageUrl) {
-        updateData.imageUrl = imageUrl;
+        clerkUpdateData.imageUrl = imageUrl;
       }
 
-      if (Object.keys(updateData).length > 0) {
-        await clerkClientInstance.users.updateUser(currentClerkId, updateData);
+      if (Object.keys(clerkUpdateData).length > 0) {
+        console.log("[PUT /api/users] Updating Clerk user:", {
+          userId: currentClerkId,
+          updateData: clerkUpdateData,
+        });
+        await clerkClientInstance.users.updateUser(currentClerkId, clerkUpdateData);
+        console.log("[PUT /api/users] Clerk user updated successfully");
       }
     } catch (err) {
       console.error("Error updating Clerk user:", err);
@@ -272,8 +280,8 @@ export async function PUT(
       bio?: string | null;
       website?: string | null;
     } = {};
-    if (name) {
-      updateData.name = name;
+    if (trimmedName) {
+      updateData.name = trimmedName;
     }
 
     if (imageUrl) {
@@ -351,6 +359,7 @@ export async function PUT(
     return NextResponse.json(
       {
         message: "프로필이 성공적으로 업데이트되었습니다.",
+        name: trimmedName,
         image_url: imageUrl,
         bio: trimmedBio,
         website: normalizedWebsite,

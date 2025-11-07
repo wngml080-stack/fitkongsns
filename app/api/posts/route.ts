@@ -268,10 +268,10 @@ export async function GET(request: NextRequest) {
     
     let usersData: any[] | null = null;
     if (userIds.length > 0) {
-      // profile_image_url 컬럼이 없을 수 있으므로, 먼저 기본 컬럼만 조회 시도
+      // profile_image_url 컬럼 포함하여 조회
       const { data, error: usersError } = await supabase
         .from("users")
-        .select("id, clerk_id, name")
+        .select("id, clerk_id, name, profile_image_url")
         .in("id", userIds);
 
       if (usersError) {
@@ -301,7 +301,7 @@ export async function GET(request: NextRequest) {
     // Clerk에서 사용자 프로필 이미지 가져오기 (선택적, 에러가 나도 계속 진행)
     const userImageMap = new Map<string, string>();
 
-    // profile_image_url은 컬럼이 있을 때만 사용 (마이그레이션 미적용 시 대비)
+    // Supabase의 profile_image_url을 최우선으로 사용
     (usersData || []).forEach((user) => {
       if (user.profile_image_url) {
         userImageMap.set(user.id, user.profile_image_url);
