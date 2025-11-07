@@ -781,7 +781,7 @@ export default function CreatePostModal({
                   <EmojiPicker
                     onEmojiClick={handleEmojiClick}
                     autoFocusSearch={false}
-                    theme={theme === "dark" ? "dark" : "light"}
+                    theme={(theme === "dark" ? "dark" : "light") as any}
                     width={350}
                     height={400}
                     previewConfig={{ showPreview: false }}
