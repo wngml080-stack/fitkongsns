@@ -597,14 +597,80 @@ export async function POST(request: NextRequest) {
     }
 
     // Clerk user_id로 Supabase users 테이블에서 user_id 조회
-    const { data: userData, error: userError } = await supabase
+    console.log("[POST /api/posts] Looking up user for clerk_id:", userId);
+    let { data: userData, error: userError } = await supabase
       .from("users")
       .select("id")
       .eq("clerk_id", userId)
       .single();
 
     if (userError || !userData) {
-      console.error("Error fetching user:", userError);
+      console.error("[POST /api/posts] Error fetching user:", {
+        error: userError,
+        code: userError?.code,
+        message: userError?.message,
+        details: userError?.details,
+        hint: userError?.hint,
+        clerkId: userId,
+      });
+      
+      // 사용자가 없으면 생성 시도
+      if (userError?.code === "PGRST116") {
+        console.log("[POST /api/posts] User not found, attempting to create user");
+        try {
+          const clerkClientInstance = await clerkClient();
+          const clerkUser = await clerkClientInstance.users.getUser(userId);
+          
+          const userName = clerkUser.fullName || 
+                          clerkUser.username || 
+                          clerkUser.emailAddresses[0]?.emailAddress || 
+                          "Unknown";
+          
+          const { data: newUser, error: createError } = await supabase
+            .from("users")
+            .insert({
+              clerk_id: userId,
+              name: userName,
+            })
+            .select("id")
+            .single();
+          
+          if (createError || !newUser) {
+            console.error("[POST /api/posts] Error creating user:", createError);
+            return NextResponse.json(
+              { 
+                error: "사용자 정보를 찾을 수 없습니다. 새로고침 후 다시 시도해주세요.",
+                details: createError?.message || String(createError)
+              },
+              { status: 500 }
+            );
+          }
+          
+          console.log("[POST /api/posts] User created successfully:", newUser.id);
+          // 새로 생성된 사용자 정보 사용
+          userData = newUser;
+        } catch (createErr) {
+          console.error("[POST /api/posts] Error in user creation process:", createErr);
+          return NextResponse.json(
+            { 
+              error: "사용자 정보를 찾을 수 없습니다. 새로고침 후 다시 시도해주세요.",
+              details: createErr instanceof Error ? createErr.message : String(createErr)
+            },
+            { status: 500 }
+          );
+        }
+      } else {
+        return NextResponse.json(
+          { 
+            error: "사용자 정보를 찾을 수 없습니다.",
+            details: userError?.message || String(userError)
+          },
+          { status: 404 }
+        );
+      }
+    }
+
+    if (!userData) {
       return NextResponse.json(
         { error: "사용자 정보를 찾을 수 없습니다." },
         { status: 404 }

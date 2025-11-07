@@ -162,9 +162,18 @@ export default function EditProfileModal({
       });
 
       if (!response.ok) {
-        const errorMessage = await extractErrorMessage(response);
+        const errorData = await response.json().catch(() => ({}));
+        const errorMessage = errorData.error || await extractErrorMessage(response);
+        console.error("[EditProfileModal] API Error:", {
+          status: response.status,
+          statusText: response.statusText,
+          error: errorData,
+        });
         throw new Error(errorMessage);
       }
+
+      const result = await response.json();
+      console.log("[EditProfileModal] Update success:", result);
 
       onOpenChange(false);
       if (onSuccess) {

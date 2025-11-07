@@ -12,6 +12,12 @@ async function getCurrentUserId(supabase: ReturnType<typeof getServiceRoleClient
     .single();
 
   if (error || !data) {
+    console.error("[getCurrentUserId] Error:", {
+      error,
+      clerkId,
+      code: error?.code,
+      message: error?.message,
+    });
     throw new Error("사용자 정보를 찾을 수 없습니다.");
   }
 
@@ -36,6 +42,11 @@ export async function GET(request: NextRequest) {
     const supabase = getServiceRoleClient();
     const userUuid = await getCurrentUserId(supabase, userId);
 
+    console.log("[GET /api/bookmarks] Fetching bookmarks for user:", {
+      clerkId: userId,
+      userUuid,
+    });
+
     const { data: bookmarkRows, error: bookmarksError } = await supabase
       .from("bookmarks")
       .select("post_id, created_at")
@@ -43,9 +54,18 @@ export async function GET(request: NextRequest) {
       .order("created_at", { ascending: false });
 
     if (bookmarksError) {
-      console.error("Error fetching bookmarks:", bookmarksError);
+      console.error("[GET /api/bookmarks] Error fetching bookmarks:", {
+        error: bookmarksError,
+        code: bookmarksError.code,
+        message: bookmarksError.message,
+        details: bookmarksError.details,
+        hint: bookmarksError.hint,
+      });
       return NextResponse.json(
-        { error: "저장한 게시물을 불러오는데 실패했습니다." },
+        { 
+          error: "저장한 게시물을 불러오는데 실패했습니다.",
+          details: bookmarksError.message || String(bookmarksError)
+        },
         { status: 500 }
       );
     }
@@ -66,16 +86,78 @@ export async function GET(request: NextRequest) {
       });
     }
 
-    const { data: postsData, error: postsError } = await supabase
+    // post_stats 뷰가 없을 수 있으므로 posts 테이블 직접 조회
+    let postsData: any[] | null = null;
+    let postsError: any = null;
+
+    // 먼저 post_stats 뷰 시도
+    const viewResult = await supabase
       .from("post_stats")
       .select("post_id, image_url, likes_count, comments_count, created_at")
       .in("post_id", pagedPostIds)
       .order("created_at", { ascending: false });
 
+    if (viewResult.error) {
+      console.warn("[GET /api/bookmarks] post_stats 뷰 조회 실패, posts 테이블 직접 조회:", viewResult.error);
+      
+      // 뷰가 없으면 posts 테이블 직접 조회
+      const postsResult = await supabase
+        .from("posts")
+        .select("id, image_url, created_at")
+        .in("id", pagedPostIds)
+        .order("created_at", { ascending: false });
+
+      if (postsResult.error) {
+        postsError = postsResult.error;
+      } else {
+        // 좋아요 수와 댓글 수 계산
+        const [likesResult, commentsResult] = await Promise.all([
+          supabase
+            .from("likes")
+            .select("post_id")
+            .in("post_id", pagedPostIds),
+          supabase
+            .from("comments")
+            .select("post_id")
+            .in("post_id", pagedPostIds),
+        ]);
+
+        const likesCountMap = new Map<string, number>();
+        const commentsCountMap = new Map<string, number>();
+
+        (likesResult.data || []).forEach((like: any) => {
+          likesCountMap.set(like.post_id, (likesCountMap.get(like.post_id) || 0) + 1);
+        });
+
+        (commentsResult.data || []).forEach((comment: any) => {
+          commentsCountMap.set(comment.post_id, (commentsCountMap.get(comment.post_id) || 0) + 1);
+        });
+
+        postsData = (postsResult.data || []).map((post) => ({
+          post_id: post.id,
+          image_url: post.image_url,
+          created_at: post.created_at,
+          likes_count: likesCountMap.get(post.id) || 0,
+          comments_count: commentsCountMap.get(post.id) || 0,
+        }));
+      }
+    } else {
+      postsData = viewResult.data;
+    }
+
     if (postsError) {
-      console.error("Error fetching bookmarked posts:", postsError);
+      console.error("[GET /api/bookmarks] Error fetching bookmarked posts:", {
+        error: postsError,
+        code: postsError.code,
+        message: postsError.message,
+        details: postsError.details,
+        hint: postsError.hint,
+      });
       return NextResponse.json(
-        { error: "게시물을 불러오는데 실패했습니다." },
+        { 
+          error: "게시물을 불러오는데 실패했습니다.",
+          details: postsError.message || String(postsError)
+        },
         { status: 500 }
       );
     }
@@ -130,9 +212,18 @@ export async function POST(request: NextRequest) {
       });
 
     if (insertError && insertError.code !== "23505") {
-      console.error("Error inserting bookmark:", insertError);
+      console.error("[POST /api/bookmarks] Error inserting bookmark:", {
+        error: insertError,
+        code: insertError.code,
+        message: insertError.message,
+        details: insertError.details,
+        hint: insertError.hint,
+      });
       return NextResponse.json(
-        { error: "게시물을 저장하는 데 실패했습니다." },
+        { 
+          error: "게시물을 저장하는 데 실패했습니다.",
+          details: insertError.message || String(insertError)
+        },
         { status: 500 }
       );
     }

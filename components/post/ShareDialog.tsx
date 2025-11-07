@@ -8,18 +8,8 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Share2, Copy, Check, X } from "lucide-react";
+import { Share2, Copy, Check } from "lucide-react";
 import { shareViaWebAPI, copyToClipboard } from "@/lib/utils/share";
-
-/**
- * @file ShareDialog.tsx
- * @description 공유 다이얼로그 컴포넌트
- *
- * 주요 기능:
- * - Web Share API를 통한 공유
- * - 링크 복사
- * - 공유 옵션 표시
- */
 
 interface ShareDialogProps {
   open: boolean;
@@ -40,15 +30,14 @@ export default function ShareDialog({
   const [isSharing, setIsSharing] = useState(false);
   const [canShare, setCanShare] = useState(false);
 
-  // 클라이언트에서만 navigator.share 확인
   useEffect(() => {
-    if (typeof window !== 'undefined') {
-      setCanShare(!!navigator.share);
+    if (typeof window !== "undefined" && navigator.share) {
+      setCanShare(true);
     }
   }, []);
 
   const handleWebShare = async () => {
-    if (typeof window === 'undefined' || !navigator.share) {
+    if (typeof window === "undefined" || !navigator.share) {
       alert("이 브라우저는 공유 기능을 지원하지 않습니다.");
       return;
     }
@@ -86,7 +75,6 @@ export default function ShareDialog({
         </DialogHeader>
 
         <div className="space-y-3 py-4">
-          {/* Web Share API 옵션 */}
           {canShare && (
             <Button
               onClick={handleWebShare}
@@ -104,7 +92,6 @@ export default function ShareDialog({
             </Button>
           )}
 
-          {/* 링크 복사 옵션 */}
           <Button
             onClick={handleCopyLink}
             className="w-full justify-start gap-3 h-auto py-3"
@@ -123,9 +110,8 @@ export default function ShareDialog({
                 클립보드에 링크 복사
               </div>
             </div>
-          )}
+          </Button>
 
-          {/* 링크 미리보기 */}
           <div className="pt-4 border-t">
             <div className="text-xs text-muted-foreground mb-2">공유 링크</div>
             <div className="flex items-center gap-2 p-2 bg-muted rounded-md">
@@ -148,4 +134,3 @@ export default function ShareDialog({
     </Dialog>
   );
 }
-

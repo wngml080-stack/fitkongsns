@@ -315,18 +315,37 @@ export async function PUT(
     }
  
     if (Object.keys(updateData).length > 0) {
+      console.log("[PUT /api/users] Updating user with data:", {
+        userId: userData.id,
+        updateData,
+      });
+
       const { error: updateError } = await supabase
         .from("users")
         .update(updateData)
         .eq("id", userData.id);
 
       if (updateError) {
-        console.error("Error updating user:", updateError);
+        console.error("[PUT /api/users] Error updating user:", {
+          error: updateError,
+          code: updateError.code,
+          message: updateError.message,
+          details: updateError.details,
+          hint: updateError.hint,
+          updateData,
+        });
         return NextResponse.json(
-          { error: "프로필 업데이트에 실패했습니다." },
+          { 
+            error: "프로필 업데이트에 실패했습니다.",
+            details: updateError.message || String(updateError)
+          },
           { status: 500 }
         );
       }
+
+      console.log("[PUT /api/users] User updated successfully");
+    } else {
+      console.log("[PUT /api/users] No data to update");
     }
 
     return NextResponse.json(
