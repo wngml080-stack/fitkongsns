@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Home, Search, Plus, Heart, User } from "lucide-react";
+import { Home, Search, Plus, Heart, Bookmark, User } from "lucide-react";
 import { SignedIn, SignedOut, SignInButton, UserButton, useAuth } from "@clerk/nextjs";
 import { useUser } from "@clerk/nextjs";
 import { useState } from "react";
@@ -37,6 +37,7 @@ const menuItems: MenuItem[] = [
   { href: "/search", icon: Search, label: "검색" },
   { href: "/create", icon: Plus, label: "만들기", requiresAuth: true },
   { href: "/activity", icon: Heart, label: "좋아요", requiresAuth: true },
+  { href: "/saved", icon: Bookmark, label: "저장됨", requiresAuth: true },
   { href: "/profile", icon: User, label: "프로필", requiresAuth: true },
 ];
 

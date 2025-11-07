@@ -58,6 +58,23 @@ export async function GET(request: NextRequest) {
     const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
     const supabase = createClient(supabaseUrl, supabaseKey);
 
+    const { userId: currentClerkId } = await auth();
+    let currentUserUuid: string | null = null;
+    if (currentClerkId) {
+      try {
+        const { data: currentUserRecord } = await supabase
+          .from("users")
+          .select("id")
+          .eq("clerk_id", currentClerkId)
+          .single();
+        if (currentUserRecord?.id) {
+          currentUserUuid = currentUserRecord.id;
+        }
+      } catch (err) {
+        console.warn("Failed to fetch current user for bookmarks:", err);
+      }
+    }
+
     // userId 파라미터가 있으면 Supabase user_id로 변환
     let targetUserId: string | null = null;
     if (userIdParam) {
@@ -290,45 +307,76 @@ export async function GET(request: NextRequest) {
 
     // 각 게시물에 대해 댓글 최신 2개 가져오기
     const postIds = postsData.map((post) => post.post_id);
-    const { data: allCommentsData, error: commentsError } = await supabase
+
+    let bookmarkedPostIds = new Set<string>();
+    if (currentUserUuid && postIds.length > 0) {
+      try {
+        const { data: bookmarkData } = await supabase
+          .from("bookmarks")
+          .select("post_id")
+          .eq("user_id", currentUserUuid)
+          .in("post_id", postIds);
+
+        if (bookmarkData) {
+          bookmarkedPostIds = new Set(bookmarkData.map((row) => row.post_id));
+        }
+      } catch (err) {
+        console.warn("Failed to fetch bookmark statuses:", err);
+      }
+    }
+
+    const { data: commentsData } = await supabase
       .from("comments")
-      .select("id, post_id, content, created_at, user_id")
+      .select(
+        "id, post_id, user_id, content, created_at, user:user_id (id, clerk_id, name)"
+      )
       .in("post_id", postIds)
       .order("created_at", { ascending: false });
 
-    // 댓글 작성자 정보 가져오기
-    const commentUserIds = [
-      ...new Set((allCommentsData || []).map((c: any) => c.user_id)),
-    ];
-    const { data: commentUsersData } = await supabase
-      .from("users")
-      .select("id, clerk_id, name")
-      .in("id", commentUserIds);
+    let postMentionsData: any[] = [];
+    if (postIds.length > 0) {
+      const { data } = await supabase
+        .from("mentions")
+        .select(
+          "post_id, display_text, mentioned_user:mentioned_user_id (id, clerk_id, name)"
+        )
+        .in("post_id", postIds)
+        .is("comment_id", null);
 
-    // 댓글과 사용자 정보 조합
-    const commentsData = (allCommentsData || []).map((comment: any) => {
-      const user = commentUsersData?.find((u) => u.id === comment.user_id);
-      return {
-        ...comment,
-        user: {
-          id: user?.id || comment.user_id,
-          clerk_id: user?.clerk_id || "",
-          name: user?.name || "Unknown",
-        },
-      };
-    });
-
-    if (commentsError) {
-      console.error("Error fetching comments:", commentsError);
-      // 댓글이 없어도 계속 진행
+      postMentionsData = data || [];
     }
 
-    // 댓글을 post_id별로 그룹화하고 최신 2개만 선택
+    const postMentionsByPostId = new Map<string, Array<{
+      display_text: string;
+      user: { id: string; clerk_id: string; name: string };
+    }>>();
+
+    (postMentionsData || []).forEach((mention: any) => {
+      if (!postMentionsByPostId.has(mention.post_id)) {
+        postMentionsByPostId.set(mention.post_id, []);
+      }
+      const list = postMentionsByPostId.get(mention.post_id)!;
+      if (mention.mentioned_user) {
+        list.push({
+          display_text: mention.display_text,
+          user: {
+            id: mention.mentioned_user.id,
+            clerk_id: mention.mentioned_user.clerk_id,
+            name: mention.mentioned_user.name,
+          },
+        });
+      }
+    });
+
     const commentsByPostId = new Map<string, Array<{
       id: string;
       content: string;
       created_at: string;
-      user: { id: string; name: string };
+      user: { id: string; name: string; clerk_id: string };
+      mentions: Array<{
+        display_text: string;
+        user: { id: string; clerk_id: string; name: string };
+      }>;
     }>>();
     
     (commentsData || []).forEach((comment: any) => {
@@ -342,6 +390,7 @@ export async function GET(request: NextRequest) {
           content: comment.content,
           created_at: comment.created_at,
           user: comment.user,
+          mentions: commentMentionsMap.get(comment.id) || [],
         });
       }
     });
@@ -364,6 +413,7 @@ export async function GET(request: NextRequest) {
           clerk_id: user?.clerk_id || "",
           name: user?.name || "Unknown",
           image_url: userImageMap.get(user?.id || ""),
+          profile_image_url: userImageMap.get(user?.id || ""),
         },
         comments: comments.map((comment: any) => ({
           id: comment.id,
@@ -374,7 +424,10 @@ export async function GET(request: NextRequest) {
             clerk_id: comment.user.clerk_id,
             name: comment.user.name,
           },
+          mentions: comment.mentions,
         })),
+        mentions: postMentionsByPostId.get(post.post_id) || [],
+        isBookmarked: bookmarkedPostIds.has(post.post_id),
       };
     });
 
@@ -425,9 +478,33 @@ export async function POST(request: NextRequest) {
     }
 
     // FormData 파싱
+    const supabase = getServiceRoleClient();
     const formData = await request.formData();
+    const caption = formData.get("caption") as string | null;
     const imageFile = formData.get("image") as File | null;
-    const caption = (formData.get("caption") as string) || null;
+    const rawMentions = formData.get("mentions") as string | null;
+
+    if (!imageFile) {
+      return NextResponse.json(
+        { error: "이미지 파일이 필요합니다." },
+        { status: 400 }
+      );
+    }
+
+    let mentionPayload: Array<{ mentioned_user_id: string; display_text: string }> = [];
+    if (rawMentions) {
+      try {
+        const parsed = JSON.parse(rawMentions);
+        if (Array.isArray(parsed)) {
+          mentionPayload = parsed.filter(
+            (item: any) =>
+              item && typeof item.mentioned_user_id === "string" && typeof item.display_text === "string"
+          );
+        }
+      } catch (error) {
+        console.warn("Failed to parse mentions payload:", error);
+      }
+    }
 
     // 이미지 파일 검증
     if (!imageFile) {
@@ -564,6 +641,37 @@ export async function POST(request: NextRequest) {
         }
       } catch (err) {
         console.error("Error processing hashtags:", err);
+      }
+    }
+
+    const normalizedCaption = (caption || "").toLowerCase();
+    if (mentionPayload.length > 0) {
+      const seen = new Set<string>();
+      const validMentions = mentionPayload.filter((mention) => {
+        const key = `@${mention.display_text.toLowerCase()}`;
+        const uniqueKey = `${mention.mentioned_user_id}-${key}`;
+        if (!normalizedCaption.includes(key) || seen.has(uniqueKey)) {
+          return false;
+        }
+        seen.add(uniqueKey);
+        return true;
+      });
+
+      if (validMentions.length > 0) {
+        try {
+          await supabase.from("mentions").insert(
+            validMentions.map((mention) => ({
+              post_id: postData.id,
+              comment_id: null,
+              mentioned_user_id: mention.mentioned_user_id,
+              mentioner_user_id: userData.id,
+              display_text: mention.display_text,
+            })),
+            { returning: "minimal" }
+          );
+        } catch (err) {
+          console.error("Error inserting mentions:", err);
+        }
       }
     }
 

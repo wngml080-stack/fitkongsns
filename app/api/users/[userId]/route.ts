@@ -117,6 +117,7 @@ export async function GET(
         clerk_id: userStats.clerk_id,
         name: userStats.name,
         image_url: profileImageUrl,
+        profile_image_url: profileImageUrl,
         posts_count: userStats.posts_count || 0,
         followers_count: userStats.followers_count || 0,
         following_count: userStats.following_count || 0,

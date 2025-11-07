@@ -35,6 +35,7 @@ interface UserData {
   clerk_id: string;
   name: string;
   image_url: string | null;
+  profile_image_url: string | null;
   posts_count: number;
   followers_count: number;
   following_count: number;
@@ -168,7 +169,9 @@ export default function ProfileHeader({ userId }: ProfileHeaderProps) {
   }
 
   // 프로필 이미지 URL (Clerk 또는 기본 아바타)
-  const profileImageUrl = userData.image_url || 
+  const profileImageUrl =
+    userData.profile_image_url ||
+    userData.image_url ||
     `https://api.dicebear.com/7.x/avataaars/svg?seed=${userData.clerk_id}`;
 
   // SVG 이미지는 unoptimized 옵션 사용
@@ -341,7 +344,7 @@ export default function ProfileHeader({ userId }: ProfileHeaderProps) {
           open={isEditModalOpen}
           onOpenChange={setIsEditModalOpen}
           currentName={userData.name}
-          currentImageUrl={userData.image_url}
+          currentImageUrl={userData.profile_image_url || userData.image_url}
           currentBio={userData.bio}
           currentWebsite={userData.website}
           onSuccess={() => {

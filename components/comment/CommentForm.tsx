@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, FormEvent } from "react";
+import { useState, FormEvent, useRef, useEffect } from "react";
 import { useAuth } from "@clerk/nextjs";
 import { SignInButton } from "@clerk/nextjs";
 import { Button } from "@/components/ui/button";
@@ -29,11 +29,75 @@ interface CommentFormProps {
   onSuccess?: () => void; // 댓글 작성 성공 시 콜백
 }
 
+interface MentionSuggestion {
+  id: string;
+  clerk_id: string;
+  name: string;
+}
+
+interface MentionSelection extends MentionSuggestion {
+  displayText: string;
+}
+
 export default function CommentForm({ postId, onSuccess }: CommentFormProps) {
   const { isSignedIn, userId } = useAuth();
   const [content, setContent] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const [cursorPosition, setCursorPosition] = useState(0);
+  const [showMentionSuggestions, setShowMentionSuggestions] = useState(false);
+  const [mentionQuery, setMentionQuery] = useState("");
+  const [mentionSuggestions, setMentionSuggestions] = useState<MentionSuggestion[]>([]);
+  const [mentionSelections, setMentionSelections] = useState<MentionSelection[]>([]);
+
+  useEffect(() => {
+    if (!mentionQuery) {
+      setMentionSuggestions([]);
+      return;
+    }
+
+    const controller = new AbortController();
+
+    const fetchSuggestions = async () => {
+      try {
+        const response = await fetch(`/api/users/search?q=${encodeURIComponent(mentionQuery)}`, {
+          signal: controller.signal,
+        });
+
+        if (!response.ok) {
+          return;
+        }
+
+        const data = await response.json();
+        setMentionSuggestions(data.users || []);
+      } catch (err) {
+        if ((err as Error).name !== "AbortError") {
+          console.error("Error fetching mention suggestions:", err);
+        }
+      }
+    };
+
+    const timeout = setTimeout(fetchSuggestions, 200);
+    return () => {
+      controller.abort();
+      clearTimeout(timeout);
+    };
+  }, [mentionQuery]);
+
+  const sanitizeMentions = (text: string, mentions: MentionSelection[]) => {
+    const normalized = text.toLowerCase();
+    const seen = new Set<string>();
+    return mentions.filter((mention) => {
+      const key = `@${mention.displayText.toLowerCase()}`;
+      const uniqueKey = `${mention.id}-${key}`;
+      if (!normalized.includes(key) || seen.has(uniqueKey)) {
+        return false;
+      }
+      seen.add(uniqueKey);
+      return true;
+    });
+  };
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
@@ -52,6 +116,7 @@ export default function CommentForm({ postId, onSuccess }: CommentFormProps) {
     setError(null);
 
     try {
+      const validMentions = sanitizeMentions(trimmedContent, mentionSelections);
       const response = await fetch("/api/comments", {
         method: "POST",
         headers: {
@@ -60,6 +125,10 @@ export default function CommentForm({ postId, onSuccess }: CommentFormProps) {
         body: JSON.stringify({
           post_id: postId,
           content: trimmedContent,
+          mentions: validMentions.map((mention) => ({
+            mentioned_user_id: mention.id,
+            display_text: mention.displayText,
+          })),
         }),
       });
 
@@ -71,6 +140,9 @@ export default function CommentForm({ postId, onSuccess }: CommentFormProps) {
       // 성공 시 입력 필드 초기화
       setContent("");
       setError(null);
+      setMentionSelections([]);
+      setMentionQuery("");
+      setShowMentionSuggestions(false);
 
       // 성공 콜백 호출
       if (onSuccess) {
@@ -89,7 +161,65 @@ export default function CommentForm({ postId, onSuccess }: CommentFormProps) {
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
       handleSubmit(e);
+    } else if (e.key === "Escape") {
+      setShowMentionSuggestions(false);
     }
+  };
+
+  const handleContentChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    setContent(value);
+    setError(null);
+
+    const cursorPos = e.target.selectionStart || value.length;
+    setCursorPosition(cursorPos);
+
+    setMentionSelections((prev) => sanitizeMentions(value, prev));
+
+    const textBeforeCursor = value.substring(0, cursorPos);
+    const lastAtIndex = textBeforeCursor.lastIndexOf("@");
+
+    if (lastAtIndex !== -1) {
+      const textAfterAt = textBeforeCursor.substring(lastAtIndex + 1);
+      if (!textAfterAt.includes(" ") && !textAfterAt.includes("\n")) {
+        setMentionQuery(textAfterAt);
+        setShowMentionSuggestions(textAfterAt.length > 0);
+        return;
+      }
+    }
+
+    setShowMentionSuggestions(false);
+    setMentionQuery("");
+  };
+
+  const handleMentionSelect = (suggestion: MentionSuggestion) => {
+    const input = inputRef.current;
+    if (!input) {
+      return;
+    }
+
+    const start = cursorPosition;
+    const textBeforeCursor = content.substring(0, start);
+    const lastAtIndex = textBeforeCursor.lastIndexOf("@");
+
+    if (lastAtIndex !== -1) {
+      const displayText = suggestion.name;
+      const newText =
+        content.substring(0, lastAtIndex) +
+        `@${displayText} ` +
+        content.substring(start);
+      setContent(newText);
+      setMentionSelections((prev) => [...prev, { ...suggestion, displayText }]);
+
+      setTimeout(() => {
+        input.focus();
+        const newCursorPos = lastAtIndex + displayText.length + 2;
+        input.setSelectionRange(newCursorPos, newCursorPos);
+      }, 0);
+    }
+
+    setShowMentionSuggestions(false);
+    setMentionQuery("");
   };
 
   // 로그인하지 않은 사용자
@@ -122,15 +252,13 @@ export default function CommentForm({ postId, onSuccess }: CommentFormProps) {
 
   return (
     <form onSubmit={handleSubmit} className="border-t border-[var(--instagram-border)] dark:border-[var(--border)]">
-      <div className="flex items-center gap-2 px-4 py-3">
+      <div className="relative flex items-center gap-2 px-4 py-3">
         <Input
+          ref={inputRef}
           type="text"
           placeholder="댓글 달기..."
           value={content}
-          onChange={(e) => {
-            setContent(e.target.value);
-            setError(null);
-          }}
+          onChange={handleContentChange}
           onKeyDown={handleKeyDown}
           disabled={isSubmitting}
           className="flex-1 border-0 focus-visible:ring-0 focus-visible:ring-offset-0 bg-transparent text-sm"
@@ -149,6 +277,31 @@ export default function CommentForm({ postId, onSuccess }: CommentFormProps) {
             "게시"
           )}
         </Button>
+        {showMentionSuggestions && (
+          <div className="absolute left-4 right-4 top-full mt-1 bg-white dark:bg-[var(--card)] border border-[var(--instagram-border)] dark:border-[var(--border)] rounded-md shadow-lg max-h-48 overflow-y-auto z-10">
+            {mentionSuggestions.length > 0 ? (
+              mentionSuggestions.map((user) => (
+                <button
+                  key={user.id}
+                  type="button"
+                  onClick={() => handleMentionSelect(user)}
+                  className="w-full text-left px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors text-sm"
+                >
+                  <span className="block text-[var(--instagram-text-primary)] dark:text-[var(--foreground)]">
+                    {user.name}
+                  </span>
+                  <span className="block text-xs text-[var(--instagram-text-secondary)] dark:text-[var(--muted-foreground)]">
+                    @{user.clerk_id}
+                  </span>
+                </button>
+              ))
+            ) : (
+              <div className="px-4 py-2 text-sm text-[var(--instagram-text-secondary)] dark:text-[var(--muted-foreground)]">
+                결과가 없습니다
+              </div>
+            )}
+          </div>
+        )}
       </div>
       {error && (
         <div className="px-4 pb-2">

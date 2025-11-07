@@ -26,8 +26,10 @@ interface Comment {
   created_at: string;
   user: {
     id: string;
+    clerk_id: string;
     name: string;
   };
+  mentions?: MentionItem[];
 }
 
 interface PostUser {
@@ -48,6 +50,8 @@ interface Post {
   user: PostUser;
   comments: Comment[];
   isLiked?: boolean; // 선택적: 초기 로드 시 좋아요 상태
+  isBookmarked?: boolean;
+  mentions?: MentionItem[];
 }
 
 interface PostsResponse {

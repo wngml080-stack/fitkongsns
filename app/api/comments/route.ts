@@ -25,7 +25,7 @@ export async function POST(request: NextRequest) {
 
     // 요청 본문 파싱
     const body = await request.json();
-    const { post_id, content } = body;
+    const { post_id, content, mentions: rawMentions } = body;
 
     // 입력 검증
     if (!post_id) {
@@ -74,6 +74,13 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    const mentionPayload: Array<{ mentioned_user_id: string; display_text: string }> = Array.isArray(rawMentions)
+      ? rawMentions.filter(
+          (item: any) =>
+            item && typeof item.mentioned_user_id === "string" && typeof item.display_text === "string"
+        )
+      : [];
+
     // 댓글 저장
     const { data: commentData, error: commentError } = await supabase
       .from("comments")
@@ -91,6 +98,37 @@ export async function POST(request: NextRequest) {
         { error: "댓글 작성에 실패했습니다." },
         { status: 500 }
       );
+    }
+
+    const normalizedContent = content.toLowerCase();
+    if (mentionPayload.length > 0) {
+      const seen = new Set<string>();
+      const validMentions = mentionPayload.filter((mention) => {
+        const key = `@${mention.display_text.toLowerCase()}`;
+        const uniqueKey = `${mention.mentioned_user_id}-${key}`;
+        if (!normalizedContent.includes(key) || seen.has(uniqueKey)) {
+          return false;
+        }
+        seen.add(uniqueKey);
+        return true;
+      });
+
+      if (validMentions.length > 0) {
+        try {
+          await supabase.from("mentions").insert(
+            validMentions.map((mention) => ({
+              post_id: null,
+              comment_id: commentData.id,
+              mentioned_user_id: mention.mentioned_user_id,
+              mentioner_user_id: userData.id,
+              display_text: mention.display_text,
+            })),
+            { returning: "minimal" }
+          );
+        } catch (err) {
+          console.error("Error inserting comment mentions:", err);
+        }
+      }
     }
 
     // 응답에 사용자 정보 포함

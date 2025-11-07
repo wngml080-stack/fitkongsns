@@ -48,6 +48,16 @@ interface CreatePostModalProps {
   onSuccess?: () => void; // 게시 성공 시 콜백
 }
 
+interface MentionSuggestion {
+  id: string;
+  clerk_id: string;
+  name: string;
+}
+
+interface MentionSelection extends MentionSuggestion {
+  displayText: string;
+}
+
 const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
 const MAX_CAPTION_LENGTH = 2200;
 
@@ -78,18 +88,58 @@ export default function CreatePostModal({
   
   // 이모지 피커 상태
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
-  
-  // 해시태그 추천 상태
+  const emojiPickerRef = useRef<HTMLDivElement>(null);
+  const [mounted, setMounted] = useState(false);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const [cursorPosition, setCursorPosition] = useState(0);
   const [showHashtagSuggestions, setShowHashtagSuggestions] = useState(false);
   const [hashtagQuery, setHashtagQuery] = useState("");
-  const [cursorPosition, setCursorPosition] = useState(0);
   const hashtagSuggestionsRef = useRef<HTMLDivElement>(null);
-  const emojiPickerRef = useRef<HTMLDivElement>(null);
+  const [showMentionSuggestions, setShowMentionSuggestions] = useState(false);
+  const [mentionQuery, setMentionQuery] = useState("");
+  const [mentionSuggestions, setMentionSuggestions] = useState<MentionSuggestion[]>([]);
+  const mentionSuggestionsRef = useRef<HTMLDivElement>(null);
+  const [mentionSelections, setMentionSelections] = useState<MentionSelection[]>([]);
 
   // 마운트 확인 (다크모드 감지용)
   useEffect(() => {
     setMounted(true);
   }, []);
+
+  useEffect(() => {
+    if (!mentionQuery) {
+      setMentionSuggestions([]);
+      return;
+    }
+
+    const controller = new AbortController();
+
+    const fetchSuggestions = async () => {
+      try {
+        const response = await fetch(`/api/users/search?q=${encodeURIComponent(mentionQuery)}`, {
+          signal: controller.signal,
+        });
+
+        if (!response.ok) {
+          return;
+        }
+
+        const data = await response.json();
+        setMentionSuggestions(data.users || []);
+      } catch (error) {
+        if ((error as Error).name !== "AbortError") {
+          console.error("Error fetching mention suggestions:", error);
+        }
+      }
+    };
+
+    const timeout = setTimeout(fetchSuggestions, 200);
+
+    return () => {
+      controller.abort();
+      clearTimeout(timeout);
+    };
+  }, [mentionQuery]);
 
   // 외부 클릭 시 해시태그 추천 및 이모지 피커 닫기
   useEffect(() => {
@@ -100,6 +150,14 @@ export default function CreatePostModal({
       ) {
         setShowHashtagSuggestions(false);
       }
+
+      if (
+        mentionSuggestionsRef.current &&
+        !mentionSuggestionsRef.current.contains(event.target as Node)
+      ) {
+        setShowMentionSuggestions(false);
+      }
+
       if (
         emojiPickerRef.current &&
         !emojiPickerRef.current.contains(event.target as Node)
@@ -241,19 +299,47 @@ export default function CreatePostModal({
     // # 입력 감지
     const textBeforeCursor = value.substring(0, cursorPos);
     const lastHashIndex = textBeforeCursor.lastIndexOf("#");
-    
+
+    setMentionSelections((prev) => {
+      const normalized = value.toLowerCase();
+      const seen = new Set<string>();
+      return prev.filter((mention) => {
+        const key = `@${mention.displayText.toLowerCase()}`;
+        const uniqueKey = `${mention.id}-${key}`;
+        if (!normalized.includes(key) || seen.has(uniqueKey)) {
+          return false;
+        }
+        seen.add(uniqueKey);
+        return true;
+      });
+    });
+
+    let shouldShowHashtag = false;
     if (lastHashIndex !== -1) {
       const textAfterHash = textBeforeCursor.substring(lastHashIndex + 1);
-      // 공백이나 줄바꿈이 없으면 해시태그 입력 중
       if (!textAfterHash.includes(" ") && !textAfterHash.includes("\n")) {
         setHashtagQuery(textAfterHash);
-        setShowHashtagSuggestions(true);
-        return;
+        shouldShowHashtag = textAfterHash.length > 0;
       }
     }
-    
-    setShowHashtagSuggestions(false);
-    setHashtagQuery("");
+    setShowHashtagSuggestions(shouldShowHashtag);
+    if (!shouldShowHashtag) {
+      setHashtagQuery("");
+    }
+
+    let shouldShowMention = false;
+    const lastAtIndex = textBeforeCursor.lastIndexOf("@");
+    if (lastAtIndex !== -1) {
+      const textAfterAt = textBeforeCursor.substring(lastAtIndex + 1);
+      if (!textAfterAt.includes(" ") && !textAfterAt.includes("\n")) {
+        setMentionQuery(textAfterAt);
+        shouldShowMention = textAfterAt.length > 0;
+      }
+    }
+    setShowMentionSuggestions(shouldShowMention);
+    if (!shouldShowMention) {
+      setMentionQuery("");
+    }
   };
 
   // 해시태그 선택 핸들러
@@ -283,6 +369,36 @@ export default function CreatePostModal({
     setHashtagQuery("");
   };
 
+  const handleMentionSelect = (suggestion: MentionSuggestion) => {
+    const textarea = textareaRef.current;
+    if (!textarea) {
+      return;
+    }
+
+    const cursorPos = cursorPosition;
+    const textBeforeCursor = caption.substring(0, cursorPos);
+    const lastAtIndex = textBeforeCursor.lastIndexOf("@");
+
+    if (lastAtIndex !== -1) {
+      const displayText = suggestion.name;
+      const newText =
+        caption.substring(0, lastAtIndex) +
+        `@${displayText} ` +
+        caption.substring(cursorPos);
+      setCaption(newText);
+      setMentionSelections((prev) => [...prev, { ...suggestion, displayText }]);
+
+      setTimeout(() => {
+        textarea.focus();
+        const newCursorPos = lastAtIndex + displayText.length + 2;
+        textarea.setSelectionRange(newCursorPos, newCursorPos);
+      }, 0);
+    }
+
+    setShowMentionSuggestions(false);
+    setMentionQuery("");
+  };
+
   // 이미지 제거
   const handleRemoveImage = () => {
     if (previewUrl) {
@@ -299,6 +415,9 @@ export default function CreatePostModal({
     setShowCrop(false);
     setShowEmojiPicker(false);
     setShowHashtagSuggestions(false);
+    setShowMentionSuggestions(false);
+    setMentionSelections([]);
+    setMentionQuery("");
     if (fileInputRef.current) {
       fileInputRef.current.value = "";
     }
@@ -319,6 +438,32 @@ export default function CreatePostModal({
       formData.append("image", selectedFile);
       formData.append("caption", caption);
 
+      const normalizedMentions = (() => {
+        const normalizedCaption = caption.toLowerCase();
+        const seen = new Set<string>();
+        return mentionSelections.filter((mention) => {
+          const key = `@${mention.displayText.toLowerCase()}`;
+          const uniqueKey = `${mention.id}-${key}`;
+          if (!normalizedCaption.includes(key) || seen.has(uniqueKey)) {
+            return false;
+          }
+          seen.add(uniqueKey);
+          return true;
+        });
+      })();
+
+      if (normalizedMentions.length > 0) {
+        formData.append(
+          "mentions",
+          JSON.stringify(
+            normalizedMentions.map((mention) => ({
+              mentioned_user_id: mention.id,
+              display_text: mention.displayText,
+            }))
+          )
+        );
+      }
+
       const response = await fetch("/api/posts", {
         method: "POST",
         body: formData,
@@ -332,6 +477,7 @@ export default function CreatePostModal({
       // 성공 시 상태 초기화
       handleRemoveImage();
       setCaption("");
+      setMentionSelections([]);
       onOpenChange(false);
 
       // 피드 새로고침을 위한 커스텀 이벤트 발생
@@ -358,6 +504,9 @@ export default function CreatePostModal({
       setError(null);
       setShowEmojiPicker(false);
       setShowHashtagSuggestions(false);
+      setShowMentionSuggestions(false);
+      setMentionSelections([]);
+      setMentionQuery("");
     }
     onOpenChange(newOpen);
   };
@@ -592,6 +741,36 @@ export default function CreatePostModal({
                   ) : (
                     <div className="px-4 py-2 text-sm text-[var(--instagram-text-secondary)] dark:text-[var(--muted-foreground)]">
                       추천 해시태그가 없습니다
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {showMentionSuggestions && (
+                <div
+                  ref={mentionSuggestionsRef}
+                  className="absolute z-20 mt-1 w-full bg-white dark:bg-[var(--card)] border border-[var(--instagram-border)] dark:border-[var(--border)] rounded-md shadow-lg max-h-48 overflow-y-auto"
+                  style={{ top: "100%" }}
+                >
+                  {mentionSuggestions.length > 0 ? (
+                    mentionSuggestions.map((user) => (
+                      <button
+                        key={user.id}
+                        type="button"
+                        onClick={() => handleMentionSelect(user)}
+                        className="w-full text-left px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors text-sm"
+                      >
+                        <span className="block text-[var(--instagram-text-primary)] dark:text-[var(--foreground)]">
+                          {user.name}
+                        </span>
+                        <span className="block text-xs text-[var(--instagram-text-secondary)] dark:text-[var(--muted-foreground)]">
+                          @{user.clerk_id}
+                        </span>
+                      </button>
+                    ))
+                  ) : (
+                    <div className="px-4 py-2 text-sm text-[var(--instagram-text-secondary)] dark:text-[var(--muted-foreground)]">
+                      결과가 없습니다
                     </div>
                   )}
                 </div>

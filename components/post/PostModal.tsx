@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useMemo, useRef, useState, useEffect } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { Heart, MessageCircle, Send, Bookmark, X, Loader2 } from "lucide-react";
@@ -18,6 +18,7 @@ import { Button } from "@/components/ui/button";
 import CommentForm from "@/components/comment/CommentForm";
 import { getUserFriendlyErrorMessage, extractErrorMessage } from "@/lib/utils/error-handler";
 import { shareContent } from "@/lib/utils/share";
+import MentionText, { MentionItem } from "@/components/ui/MentionText";
 
 /**
  * @file PostModal.tsx
@@ -47,6 +48,7 @@ interface Comment {
     clerk_id: string;
     name: string;
   };
+  mentions?: MentionItem[];
 }
 
 interface PostUser {
@@ -65,24 +67,42 @@ interface Post {
   likes_count: number;
   comments_count: number;
   isLiked: boolean;
+  isBookmarked: boolean;
   user: PostUser;
   comments: Comment[];
+  mentions?: MentionItem[];
 }
 
 interface PostModalProps {
   postId: string | null;
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  initialLikesCount: number;
+  initialIsLiked: boolean;
+  initialIsBookmarked: boolean;
+  onLikeChange?: (liked: boolean, updatedLikesCount: number) => void;
+  onBookmarkChange?: (bookmarked: boolean) => void;
 }
 
-export default function PostModal({ postId, open, onOpenChange }: PostModalProps) {
+export default function PostModal({
+  open,
+  onOpenChange,
+  postId,
+  initialLikesCount,
+  initialIsLiked,
+  initialIsBookmarked,
+  onLikeChange,
+  onBookmarkChange,
+}: PostModalProps) {
   const { isSignedIn, userId } = useAuth();
   const supabase = useClerkSupabaseClient();
   const [post, setPost] = useState<Post | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [isLiked, setIsLiked] = useState(false);
-  const [likesCount, setLikesCount] = useState(0);
+  const [isLiked, setIsLiked] = useState(initialIsLiked);
+  const [likesCount, setLikesCount] = useState(initialLikesCount);
+  const [isBookmarked, setIsBookmarked] = useState(initialIsBookmarked);
+  const [isBookmarking, setIsBookmarking] = useState(false);
   const [isAnimating, setIsAnimating] = useState(false);
   const [isToggling, setIsToggling] = useState(false);
   const [comments, setComments] = useState<Comment[]>([]);
@@ -125,6 +145,10 @@ export default function PostModal({ postId, open, onOpenChange }: PostModalProps
     fetchCurrentUserId();
   }, [isSignedIn, userId, supabase]);
 
+  useEffect(() => {
+    setIsBookmarked(initialIsBookmarked);
+  }, [initialIsBookmarked, open]);
+
   const fetchPost = async () => {
     if (!postId) return;
 
@@ -141,10 +165,14 @@ export default function PostModal({ postId, open, onOpenChange }: PostModalProps
 
       const data = await response.json();
       setPost(data.post);
-      setIsLiked(data.post.isLiked || false);
-      setLikesCount(data.post.likes_count || 0);
       setComments(data.post.comments || []);
       setCommentsCount(data.post.comments_count || 0);
+      setLikesCount(data.post.likes_count || 0);
+      setIsLiked(data.post.isLiked || false);
+      setIsBookmarked(data.post.isBookmarked || false);
+      if (onBookmarkChange) {
+        onBookmarkChange(data.post.isBookmarked || false);
+      }
     } catch (err) {
       const errorMessage = getUserFriendlyErrorMessage(err);
       setError(errorMessage);
@@ -200,6 +228,54 @@ export default function PostModal({ postId, open, onOpenChange }: PostModalProps
       alert(errorMessage);
     } finally {
       setIsToggling(false);
+    }
+  };
+
+  const handleBookmarkToggle = async () => {
+    if (!isSignedIn || !post) {
+      return;
+    }
+
+    if (isBookmarking) {
+      return;
+    }
+
+    setIsBookmarking(true);
+
+    const previousBookmarked = isBookmarked;
+    const method = isBookmarked ? "DELETE" : "POST";
+
+    try {
+      const response = await fetch(
+        `/api/bookmarks${isBookmarked ? `?postId=${post.id}` : ""}`,
+        {
+          method,
+          headers:
+            method === "POST"
+              ? {
+                  "Content-Type": "application/json",
+                }
+              : undefined,
+          body: method === "POST" ? JSON.stringify({ postId: post.id }) : undefined,
+        }
+      );
+
+      if (!response.ok) {
+        const errorMessage = await extractErrorMessage(response);
+        throw new Error(errorMessage);
+      }
+
+      setIsBookmarked(!previousBookmarked);
+      if (onBookmarkChange) {
+        onBookmarkChange(!previousBookmarked);
+      }
+    } catch (error) {
+      console.error("Error toggling bookmark:", error);
+      const errorMessage = getUserFriendlyErrorMessage(error);
+      alert(errorMessage);
+      setIsBookmarked(previousBookmarked);
+    } finally {
+      setIsBookmarking(false);
     }
   };
 
@@ -338,9 +414,13 @@ export default function PostModal({ postId, open, onOpenChange }: PostModalProps
                           {post.user.name}
                         </span>
                       </Link>
-                      <span className="text-sm text-[var(--instagram-text-primary)] dark:text-[var(--foreground)]">
-                        {post.caption}
-                      </span>
+                      {post.caption && (
+                        <MentionText
+                          text={post.caption}
+                          mentions={post.mentions}
+                          className="text-sm text-[var(--instagram-text-primary)] dark:text-[var(--foreground)]"
+                        />
+                      )}
                     </div>
                   </div>
                 )}
@@ -360,9 +440,11 @@ export default function PostModal({ postId, open, onOpenChange }: PostModalProps
                                 {comment.user.name}
                               </span>
                             </Link>
-                            <span className="text-sm text-[var(--instagram-text-primary)] dark:text-[var(--foreground)]">
-                              {comment.content}
-                            </span>
+                            <MentionText
+                              text={comment.content}
+                              mentions={comment.mentions}
+                              className="text-sm text-[var(--instagram-text-primary)] dark:text-[var(--foreground)]"
+                            />
                           </div>
                           <div className="flex items-center gap-4 mt-1">
                             <span className="text-xs text-[var(--instagram-text-secondary)] dark:text-[var(--muted-foreground)]">
@@ -447,12 +529,29 @@ export default function PostModal({ postId, open, onOpenChange }: PostModalProps
                       <Send className="w-6 h-6" />
                     </button>
                   </div>
-                  <button
-                    className="text-[var(--instagram-text-primary)] dark:text-[var(--foreground)] transition-transform hover:scale-110"
-                    aria-label="북마크"
-                  >
-                    <Bookmark className="w-6 h-6" />
-                  </button>
+                  {isSignedIn ? (
+                    <button
+                      className={`transition-transform hover:scale-110 ${
+                        isBookmarked
+                          ? "text-[var(--instagram-blue)]"
+                          : "text-[var(--instagram-text-primary)] dark:text-[var(--foreground)]"
+                      }`}
+                      aria-label={isBookmarked ? "저장 취소" : "게시물 저장"}
+                      onClick={handleBookmarkToggle}
+                      disabled={isBookmarking}
+                    >
+                      <Bookmark className={`w-6 h-6 ${isBookmarked ? "fill-current" : ""}`} />
+                    </button>
+                  ) : (
+                    <SignInButton mode="modal">
+                      <button
+                        className="text-[var(--instagram-text-primary)] dark:text-[var(--foreground)] transition-transform hover:scale-110"
+                        aria-label="게시물 저장 (로그인 필요)"
+                      >
+                        <Bookmark className="w-6 h-6" />
+                      </button>
+                    </SignInButton>
+                  )}
                 </div>
 
                 {/* 좋아요 수 */}

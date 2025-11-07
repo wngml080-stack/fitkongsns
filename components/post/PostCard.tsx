@@ -27,6 +27,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
+import MentionText, { MentionItem } from "@/components/ui/MentionText";
 
 /**
  * @file PostCard.tsx
@@ -54,6 +55,7 @@ interface Comment {
     clerk_id: string;
     name: string;
   };
+  mentions?: MentionItem[];
 }
 
 interface PostUser {
@@ -74,6 +76,8 @@ interface Post {
   user: PostUser;
   comments: Comment[];
   isLiked?: boolean; // 선택적: 초기 로드 시 좋아요 상태
+  isBookmarked?: boolean;
+  mentions?: MentionItem[];
 }
 
 interface PostCardProps {
@@ -85,19 +89,21 @@ export default function PostCard({ post, onDelete }: PostCardProps) {
   const { isSignedIn, userId } = useAuth();
   const supabase = useClerkSupabaseClient();
   const [showFullCaption, setShowFullCaption] = useState(false);
-  const [isLiked, setIsLiked] = useState(post.isLiked ?? false);
+  const [isLiked, setIsLiked] = useState(post.isLiked || post.isLiked === undefined);
   const [likesCount, setLikesCount] = useState(post.likes_count);
   const [isAnimating, setIsAnimating] = useState(false);
   const [showDoubleTapHeart, setShowDoubleTapHeart] = useState(false);
   const [isToggling, setIsToggling] = useState(false);
-  const [comments, setComments] = useState<Comment[]>(post.comments);
-  const [commentsCount, setCommentsCount] = useState(post.comments_count);
+  const [comments, setComments] = useState<Comment[]>(post.comments || []);
+  const [commentsCount, setCommentsCount] = useState(post.comments_count || 0);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const lastTapRef = useRef<number>(0);
   const imageRef = useRef<HTMLDivElement>(null);
   const clickTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const [isBookmarking, setIsBookmarking] = useState(false);
+  const [isBookmarked, setIsBookmarked] = useState(post.isBookmarked ?? false);
 
   // 초기 좋아요 상태 확인
   useEffect(() => {
@@ -126,6 +132,10 @@ export default function PostCard({ post, onDelete }: PostCardProps) {
 
     checkLikeStatus();
   }, [isSignedIn, userId, post.id]);
+
+  useEffect(() => {
+    setIsBookmarked(post.isBookmarked ?? false);
+  }, [post.isBookmarked]);
 
   // 좋아요 토글 함수
   const handleLikeToggle = async () => {
@@ -175,6 +185,48 @@ export default function PostCard({ post, onDelete }: PostCardProps) {
       alert(errorMessage);
     } finally {
       setIsToggling(false);
+    }
+  };
+
+  const handleBookmarkToggle = async () => {
+    if (!isSignedIn) {
+      return;
+    }
+
+    if (isBookmarking) {
+      return;
+    }
+
+    setIsBookmarking(true);
+
+    try {
+      const method = isBookmarked ? "DELETE" : "POST";
+      const response = await fetch(
+        `/api/bookmarks${isBookmarked ? `?postId=${post.id}` : ""}`,
+        {
+          method,
+          headers:
+            method === "POST"
+              ? {
+                  "Content-Type": "application/json",
+                }
+              : undefined,
+          body: method === "POST" ? JSON.stringify({ postId: post.id }) : undefined,
+        }
+      );
+
+      if (!response.ok) {
+        const errorMessage = await extractErrorMessage(response);
+        throw new Error(errorMessage);
+      }
+
+      setIsBookmarked(!isBookmarked);
+    } catch (error) {
+      console.error("Error toggling bookmark:", error);
+      const errorMessage = getUserFriendlyErrorMessage(error);
+      alert(errorMessage);
+    } finally {
+      setIsBookmarking(false);
     }
   };
 
@@ -322,53 +374,22 @@ export default function PostCard({ post, onDelete }: PostCardProps) {
   // 댓글 목록 새로고침
   const refreshComments = async () => {
     try {
-      // 게시물의 댓글 최신 2개 가져오기
-      const { data: commentsData, error: commentsError } = await supabase
-        .from("comments")
-        .select("id, content, created_at, user_id")
-        .eq("post_id", post.id)
-        .order("created_at", { ascending: false })
-        .limit(2);
+      const response = await fetch(`/api/posts/${post.id}`);
 
-      if (commentsError) {
-        console.error("Error fetching comments:", commentsError);
-        return;
+      if (!response.ok) {
+        const errorMessage = await extractErrorMessage(response);
+        throw new Error(errorMessage);
       }
 
-      // 댓글 작성자 정보 가져오기
-      const commentUserIds = [
-        ...new Set((commentsData || []).map((c: any) => c.user_id)),
-      ];
-      const { data: commentUsersData } = await supabase
-        .from("users")
-        .select("id, clerk_id, name")
-        .in("id", commentUserIds);
+      const data = await response.json();
+      const latestPost = data.post;
 
-      // 댓글과 사용자 정보 조합
-      const commentsWithUsers = (commentsData || []).map((comment: any) => {
-        const user = commentUsersData?.find((u) => u.id === comment.user_id);
-        return {
-          id: comment.id,
-          content: comment.content,
-          created_at: comment.created_at,
-          user_id: comment.user_id, // 삭제 버튼 표시를 위해 추가
-          user: {
-            id: user?.id || comment.user_id,
-            clerk_id: user?.clerk_id || "",
-            name: user?.name || "Unknown",
-          },
-        };
-      });
+      setComments((latestPost.comments || []).slice(0, 2));
+      setCommentsCount(latestPost.comments_count || 0);
 
-      setComments(commentsWithUsers);
-
-      // 댓글 수 업데이트
-      const { count } = await supabase
-        .from("comments")
-        .select("*", { count: "exact", head: true })
-        .eq("post_id", post.id);
-
-      setCommentsCount(count || 0);
+      if (typeof latestPost.isBookmarked === "boolean") {
+        setIsBookmarked(latestPost.isBookmarked);
+      }
     } catch (error) {
       console.error("Error refreshing comments:", error);
     }
@@ -378,10 +399,13 @@ export default function PostCard({ post, onDelete }: PostCardProps) {
   const captionLines = post.caption ? Math.ceil(post.caption.length / 50) : 0;
   const shouldTruncate = captionLines > 2;
 
-  // 표시할 캡션
-  const displayCaption = shouldTruncate && !showFullCaption
+  const isCaptionTruncated = shouldTruncate && !showFullCaption;
+  const displayCaption = isCaptionTruncated
     ? post.caption?.substring(0, 100) + "..."
     : post.caption;
+  const captionMentions = (post.mentions || []).filter((mention) =>
+    displayCaption?.toLowerCase().includes(`@${mention.display_text.toLowerCase()}`)
+  );
 
   // 프로필 이미지 URL (Clerk 또는 기본 아바타)
   const profileImageUrl = post.user.image_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${post.user.clerk_id}`;
@@ -527,12 +551,29 @@ export default function PostCard({ post, onDelete }: PostCardProps) {
             <Send className="w-6 h-6" />
           </button>
         </div>
-        <button
-          className="text-[var(--instagram-text-primary)] dark:text-[var(--foreground)] transition-transform hover:scale-110"
-          aria-label="북마크"
-        >
-          <Bookmark className="w-6 h-6" />
-        </button>
+        {isSignedIn ? (
+          <button
+            onClick={handleBookmarkToggle}
+            disabled={isBookmarking}
+            className={`transition-transform hover:scale-110 ${
+              isBookmarked
+                ? "text-[var(--instagram-blue)]"
+                : "text-[var(--instagram-text-primary)] dark:text-[var(--foreground)]"
+            }`}
+            aria-label={isBookmarked ? "저장 취소" : "게시물 저장"}
+          >
+            <Bookmark className={`w-6 h-6 ${isBookmarked ? "fill-current" : ""}`} />
+          </button>
+        ) : (
+          <SignInButton mode="modal">
+            <button
+              className="text-[var(--instagram-text-primary)] dark:text-[var(--foreground)] transition-transform hover:scale-110"
+              aria-label="게시물 저장 (로그인 필요)"
+            >
+              <Bookmark className="w-6 h-6" />
+            </button>
+          </SignInButton>
+        )}
       </div>
 
       {/* 컨텐츠 */}
@@ -546,18 +587,17 @@ export default function PostCard({ post, onDelete }: PostCardProps) {
 
         {/* 캡션 */}
         {post.caption && (
-          <div className="text-sm text-[var(--instagram-text-primary)] dark:text-[var(--foreground)]">
-            <Link
-              href={`/profile/${post.user.clerk_id || post.user.id}`}
-              className="font-semibold hover:opacity-70 mr-2"
-            >
-              {post.user.name}
-            </Link>
-            <span>{displayCaption}</span>
+          <div className="px-4 pb-2 space-y-2">
+            <MentionText
+              text={displayCaption || ""}
+              mentions={isCaptionTruncated ? captionMentions : post.mentions}
+              className="text-sm text-[var(--instagram-text-primary)] dark:text-[var(--foreground)] break-words"
+            />
             {shouldTruncate && !showFullCaption && (
               <button
+                type="button"
                 onClick={() => setShowFullCaption(true)}
-                className="text-[var(--instagram-text-secondary)] dark:text-[var(--muted-foreground)] hover:text-[var(--instagram-text-primary)] dark:hover:text-[var(--foreground)] ml-1"
+                className="text-xs text-[var(--instagram-text-secondary)] dark:text-[var(--muted-foreground)] hover:underline"
               >
                 더 보기
               </button>
@@ -583,14 +623,18 @@ export default function PostCard({ post, onDelete }: PostCardProps) {
                   key={comment.id}
                   className="flex items-start justify-between gap-2 group"
                 >
-                  <div className="flex-1 text-sm text-[var(--instagram-text-primary)] dark:text-[var(--foreground)]">
+                  <div className="flex-1">
                     <Link
                       href={`/profile/${comment.user.clerk_id || comment.user.id}`}
                       className="font-semibold hover:opacity-70 mr-2"
                     >
                       {comment.user.name}
                     </Link>
-                    <span>{comment.content}</span>
+                    <MentionText
+                      text={comment.content}
+                      mentions={comment.mentions}
+                      className="text-sm text-[var(--instagram-text-primary)] dark:text-[var(--foreground)]"
+                    />
                   </div>
                   {isOwnComment && (
                     <button
@@ -616,6 +660,16 @@ export default function PostCard({ post, onDelete }: PostCardProps) {
         postId={post.id}
         open={isModalOpen}
         onOpenChange={setIsModalOpen}
+        initialLikesCount={likesCount}
+        initialIsLiked={isLiked}
+        onLikeChange={(liked, updatedLikesCount) => {
+          setIsLiked(liked);
+          setLikesCount(updatedLikesCount);
+        }}
+        initialIsBookmarked={isBookmarked}
+        onBookmarkChange={(bookmarked) => {
+          setIsBookmarked(bookmarked);
+        }}
       />
 
       {/* 삭제 확인 다이얼로그 */}

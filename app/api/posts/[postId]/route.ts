@@ -118,8 +118,9 @@ export async function GET(
       }
     }
 
-    // 현재 로그인한 사용자의 좋아요 상태 확인
+    // 현재 로그인한 사용자의 좋아요/북마크 상태 확인
     let isLiked = false;
+    let isBookmarked = false;
     if (currentClerkId) {
       try {
         const { data: currentUser } = await supabase
@@ -137,10 +138,19 @@ export async function GET(
             .single();
 
           isLiked = !!likeData;
+
+          const { data: bookmarkData } = await supabase
+            .from("bookmarks")
+            .select("id")
+            .eq("post_id", postId)
+            .eq("user_id", currentUser.id)
+            .single();
+
+          isBookmarked = !!bookmarkData;
         }
       } catch (err) {
-        // 좋아요 상태 확인 실패 시 무시
-        console.warn("Failed to check like status:", err);
+        // 상태 확인 실패 시 무시
+        console.warn("Failed to check like/bookmark status:", err);
       }
     }
 
@@ -161,6 +171,36 @@ export async function GET(
       .in("id", commentUserIds);
 
     // 댓글과 사용자 정보 조합
+    const commentIds = (commentsData || []).map((comment: any) => comment.id);
+
+    const { data: commentMentionsData } = await supabase
+      .from("mentions")
+      .select("comment_id, display_text, mentioned_user:mentioned_user_id (id, clerk_id, name)")
+      .in("comment_id", commentIds.length > 0 ? commentIds : ["00000000-0000-0000-0000-000000000000"])
+      .is("post_id", null);
+
+    const commentMentionsMap = new Map<string, Array<{
+      display_text: string;
+      user: { id: string; clerk_id: string; name: string };
+    }>>();
+
+    (commentMentionsData || []).forEach((mention: any) => {
+      if (!mention.comment_id || !mention.mentioned_user) {
+        return;
+      }
+      if (!commentMentionsMap.has(mention.comment_id)) {
+        commentMentionsMap.set(mention.comment_id, []);
+      }
+      commentMentionsMap.get(mention.comment_id)!.push({
+        display_text: mention.display_text,
+        user: {
+          id: mention.mentioned_user.id,
+          clerk_id: mention.mentioned_user.clerk_id,
+          name: mention.mentioned_user.name,
+        },
+      });
+    });
+
     const comments = (commentsData || []).map((comment: any) => {
       const user = commentUsersData?.find((u) => u.id === comment.user_id);
       return {
@@ -173,8 +213,24 @@ export async function GET(
           clerk_id: user?.clerk_id || "",
           name: user?.name || "Unknown",
         },
+        mentions: commentMentionsMap.get(comment.id) || [],
       };
     });
+
+    const { data: postMentionsData } = await supabase
+      .from("mentions")
+      .select("display_text, mentioned_user:mentioned_user_id (id, clerk_id, name)")
+      .eq("post_id", postId)
+      .is("comment_id", null);
+
+    const postMentions = (postMentionsData || []).map((mention: any) => ({
+      display_text: mention.display_text,
+      user: {
+        id: mention.mentioned_user.id,
+        clerk_id: mention.mentioned_user.clerk_id,
+        name: mention.mentioned_user.name,
+      },
+    }));
 
     if (commentsError) {
       console.error("Error fetching comments:", commentsError);
@@ -191,6 +247,7 @@ export async function GET(
         likes_count: postData.likes_count || 0,
         comments_count: postData.comments_count || 0,
         isLiked,
+        isBookmarked,
         user: {
           id: userData.id,
           clerk_id: userData.clerk_id,
@@ -198,6 +255,7 @@ export async function GET(
           image_url: userImageUrl,
         },
         comments,
+        mentions: postMentions,
       },
     });
   } catch (error) {
