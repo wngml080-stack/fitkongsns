@@ -17,7 +17,7 @@ import {
 import { Button } from "@/components/ui/button";
 import CommentForm from "@/components/comment/CommentForm";
 import { getUserFriendlyErrorMessage, extractErrorMessage } from "@/lib/utils/error-handler";
-import { shareContent } from "@/lib/utils/share";
+import ShareDialog from "./ShareDialog";
 import MentionText, { MentionItem } from "@/components/ui/MentionText";
 
 /**
@@ -108,6 +108,7 @@ export default function PostModal({
   const [comments, setComments] = useState<Comment[]>([]);
   const [commentsCount, setCommentsCount] = useState(0);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+  const [isShareDialogOpen, setIsShareDialogOpen] = useState(false);
   const commentsEndRef = useRef<HTMLDivElement>(null);
 
   // 게시물 데이터 가져오기
@@ -511,18 +512,7 @@ export default function PostModal({
                       <MessageCircle className="w-6 h-6" />
                     </button>
                     <button
-                      onClick={async () => {
-                        if (!post) return;
-                        const postUrl = `${window.location.origin}/post/${post.id}`;
-                        const result = await shareContent(
-                          postUrl,
-                          `${post.user.name}님의 게시물`,
-                          post.caption || ""
-                        );
-                        if (result.success && result.method === "clipboard") {
-                          alert("링크가 클립보드에 복사되었습니다.");
-                        }
-                      }}
+                      onClick={() => setIsShareDialogOpen(true)}
                       className="text-[var(--instagram-text-primary)] dark:text-[var(--foreground)] transition-transform hover:scale-110"
                       aria-label="공유"
                     >
@@ -577,6 +567,17 @@ export default function PostModal({
           </>
         )}
       </DialogContent>
+
+      {/* 공유 다이얼로그 */}
+      {post && (
+        <ShareDialog
+          open={isShareDialogOpen}
+          onOpenChange={setIsShareDialogOpen}
+          url={`${typeof window !== 'undefined' ? window.location.origin : ''}/post/${post.id}`}
+          title={`${post.user.name}님의 게시물`}
+          text={post.caption || ""}
+        />
+      )}
     </Dialog>
   );
 }

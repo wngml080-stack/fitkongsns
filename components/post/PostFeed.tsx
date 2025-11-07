@@ -123,7 +123,13 @@ export default function PostFeed() {
       
       if (!response.ok) {
         // 사용자 친화적 에러 메시지 추출
-        const errorMessage = await extractErrorMessage(response);
+        const errorData = await response.json().catch(() => ({}));
+        const errorMessage = errorData.error || errorData.details || await extractErrorMessage(response);
+        console.error("[PostFeed] API Error:", {
+          status: response.status,
+          statusText: response.statusText,
+          error: errorData,
+        });
         throw new Error(errorMessage);
       }
 

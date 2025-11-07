@@ -92,9 +92,10 @@ export async function GET(
     }
 
     // 사용자 정보 가져오기
+    // profile_image_url 컬럼이 없을 수 있으므로, 먼저 기본 컬럼만 조회 시도
     const { data: userData, error: userError } = await supabase
       .from("users")
-      .select("id, clerk_id, name, profile_image_url")
+      .select("id, clerk_id, name")
       .eq("id", postData.user_id)
       .single();
 
@@ -106,7 +107,8 @@ export async function GET(
     }
 
     // Clerk에서 사용자 프로필 이미지 가져오기 (선택적)
-    let userImageUrl: string | undefined = userData.profile_image_url || undefined;
+    // profile_image_url 컬럼이 없을 수 있으므로 안전하게 처리
+    let userImageUrl: string | undefined = (userData as any).profile_image_url || undefined;
     if (!userImageUrl) {
       try {
         const clerkClientInstance = await clerkClient();
@@ -253,6 +255,7 @@ export async function GET(
           clerk_id: userData.clerk_id,
           name: userData.name,
           image_url: userImageUrl,
+          profile_image_url: userImageUrl,
         },
         comments,
         mentions: postMentions,

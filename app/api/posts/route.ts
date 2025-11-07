@@ -262,23 +262,46 @@ export async function GET(request: NextRequest) {
     }
 
     // 사용자 정보 가져오기
-    const userIds = [...new Set(postsData.map((post) => post.user_id))];
-    const { data: usersData, error: usersError } = await supabase
-      .from("users")
-      .select("id, clerk_id, name, profile_image_url")
-      .in("id", userIds);
+    const userIds = [...new Set(postsData.map((post) => post.user_id).filter((id): id is string => !!id))];
+    
+    console.log("[DEBUG] userIds to fetch:", userIds);
+    
+    let usersData: any[] | null = null;
+    if (userIds.length > 0) {
+      // profile_image_url 컬럼이 없을 수 있으므로, 먼저 기본 컬럼만 조회 시도
+      const { data, error: usersError } = await supabase
+        .from("users")
+        .select("id, clerk_id, name")
+        .in("id", userIds);
 
-    if (usersError) {
-      console.error("Error fetching users:", usersError);
-      return NextResponse.json(
-        { error: "사용자 정보를 불러오는데 실패했습니다." },
-        { status: 500 }
-      );
+      if (usersError) {
+        console.error("[ERROR] Error fetching users:", {
+          error: usersError,
+          code: usersError.code,
+          message: usersError.message,
+          details: usersError.details,
+          hint: usersError.hint,
+          userIds: userIds,
+        });
+        return NextResponse.json(
+          { 
+            error: "사용자 정보를 불러오는데 실패했습니다.",
+            details: usersError.message || String(usersError)
+          },
+          { status: 500 }
+        );
+      }
+      usersData = data;
+      console.log("[DEBUG] Fetched users count:", usersData?.length || 0);
+    } else {
+      console.log("[DEBUG] No userIds to fetch, using empty array");
+      usersData = [];
     }
 
     // Clerk에서 사용자 프로필 이미지 가져오기 (선택적, 에러가 나도 계속 진행)
     const userImageMap = new Map<string, string>();
 
+    // profile_image_url은 컬럼이 있을 때만 사용 (마이그레이션 미적용 시 대비)
     (usersData || []).forEach((user) => {
       if (user.profile_image_url) {
         userImageMap.set(user.id, user.profile_image_url);
@@ -306,7 +329,7 @@ export async function GET(request: NextRequest) {
     }
 
     // 각 게시물에 대해 댓글 최신 2개 가져오기
-    const postIds = postsData.map((post) => post.post_id);
+    const postIds = postsData.map((post) => post.post_id).filter((id): id is string => !!id);
 
     let bookmarkedPostIds = new Set<string>();
     if (currentUserUuid && postIds.length > 0) {
@@ -325,13 +348,56 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    const { data: commentsData } = await supabase
-      .from("comments")
-      .select(
-        "id, post_id, user_id, content, created_at, user:user_id (id, clerk_id, name)"
-      )
-      .in("post_id", postIds)
-      .order("created_at", { ascending: false });
+    let commentsData: any[] | null = null;
+    if (postIds.length > 0) {
+      const { data } = await supabase
+        .from("comments")
+        .select(
+          "id, post_id, user_id, content, created_at, user:user_id (id, clerk_id, name)"
+        )
+        .in("post_id", postIds)
+        .order("created_at", { ascending: false });
+      commentsData = data;
+    } else {
+      commentsData = [];
+    }
+
+    // 댓글 멘션 데이터 가져오기
+    const commentIds = (commentsData || []).map((comment: any) => comment.id);
+    let commentMentionsData: any[] = [];
+    if (commentIds.length > 0) {
+      const { data } = await supabase
+        .from("mentions")
+        .select(
+          "comment_id, display_text, mentioned_user:mentioned_user_id (id, clerk_id, name)"
+        )
+        .in("comment_id", commentIds)
+        .is("post_id", null);
+
+      commentMentionsData = data || [];
+    }
+
+    const commentMentionsMap = new Map<string, Array<{
+      display_text: string;
+      user: { id: string; clerk_id: string; name: string };
+    }>>();
+
+    (commentMentionsData || []).forEach((mention: any) => {
+      if (!mention.comment_id || !mention.mentioned_user) {
+        return;
+      }
+      if (!commentMentionsMap.has(mention.comment_id)) {
+        commentMentionsMap.set(mention.comment_id, []);
+      }
+      commentMentionsMap.get(mention.comment_id)!.push({
+        display_text: mention.display_text,
+        user: {
+          id: mention.mentioned_user.id,
+          clerk_id: mention.mentioned_user.clerk_id,
+          name: mention.mentioned_user.name,
+        },
+      });
+    });
 
     let postMentionsData: any[] = [];
     if (postIds.length > 0) {
@@ -529,9 +595,6 @@ export async function POST(request: NextRequest) {
         { status: 400 }
       );
     }
-
-    // Supabase Service Role 클라이언트 사용 (Storage 업로드 및 DB 저장)
-    const supabase = getServiceRoleClient();
 
     // Clerk user_id로 Supabase users 테이블에서 user_id 조회
     const { data: userData, error: userError } = await supabase

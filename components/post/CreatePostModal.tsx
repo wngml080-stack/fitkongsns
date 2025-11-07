@@ -89,8 +89,6 @@ export default function CreatePostModal({
   // 이모지 피커 상태
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const emojiPickerRef = useRef<HTMLDivElement>(null);
-  const [mounted, setMounted] = useState(false);
-  const textareaRef = useRef<HTMLTextAreaElement>(null);
   const [cursorPosition, setCursorPosition] = useState(0);
   const [showHashtagSuggestions, setShowHashtagSuggestions] = useState(false);
   const [hashtagQuery, setHashtagQuery] = useState("");

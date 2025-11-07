@@ -11,7 +11,7 @@ import { SignInButton } from "@clerk/nextjs";
 import CommentForm from "@/components/comment/CommentForm";
 import PostModal from "./PostModal";
 import { getUserFriendlyErrorMessage, extractErrorMessage } from "@/lib/utils/error-handler";
-import { shareContent } from "@/lib/utils/share";
+import ShareDialog from "./ShareDialog";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -99,6 +99,7 @@ export default function PostCard({ post, onDelete }: PostCardProps) {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [isShareDialogOpen, setIsShareDialogOpen] = useState(false);
   const lastTapRef = useRef<number>(0);
   const imageRef = useRef<HTMLDivElement>(null);
   const clickTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -534,17 +535,7 @@ export default function PostCard({ post, onDelete }: PostCardProps) {
             <MessageCircle className="w-6 h-6" />
           </button>
           <button
-            onClick={async () => {
-              const postUrl = `${window.location.origin}/post/${post.id}`;
-              const result = await shareContent(
-                postUrl,
-                `${post.user.name}님의 게시물`,
-                post.caption || ""
-              );
-              if (result.success && result.method === "clipboard") {
-                alert("링크가 클립보드에 복사되었습니다.");
-              }
-            }}
+            onClick={() => setIsShareDialogOpen(true)}
             className="text-[var(--instagram-text-primary)] dark:text-[var(--foreground)] transition-transform hover:scale-110"
             aria-label="공유"
           >
@@ -699,6 +690,15 @@ export default function PostCard({ post, onDelete }: PostCardProps) {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* 공유 다이얼로그 */}
+      <ShareDialog
+        open={isShareDialogOpen}
+        onOpenChange={setIsShareDialogOpen}
+        url={`${typeof window !== 'undefined' ? window.location.origin : ''}/post/${post.id}`}
+        title={`${post.user.name}님의 게시물`}
+        text={post.caption || ""}
+      />
     </article>
   );
 }
