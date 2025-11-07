@@ -122,8 +122,7 @@ export async function POST(request: NextRequest) {
               mentioned_user_id: mention.mentioned_user_id,
               mentioner_user_id: userData.id,
               display_text: mention.display_text,
-            })),
-            { returning: "minimal" }
+            }))
           );
         } catch (err) {
           console.error("Error inserting comment mentions:", err);
