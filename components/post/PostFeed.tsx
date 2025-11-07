@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef, useCallback } from "react";
 import PostCard from "./PostCard";
 import PostCardSkeleton from "./PostCardSkeleton";
 
@@ -61,17 +61,60 @@ export default function PostFeed() {
   const [error, setError] = useState<string | null>(null);
   const [hasMore, setHasMore] = useState(false);
   const [page, setPage] = useState(1);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
+  const observerTarget = useRef<HTMLDivElement>(null);
 
+  // 초기 로드
   useEffect(() => {
-    fetchPosts();
+    fetchPosts(1, true);
   }, []);
 
-  const fetchPosts = async () => {
+  // 게시물 작성 후 피드 새로고침
+  useEffect(() => {
+    const handlePostCreated = () => {
+      fetchPosts(1, true);
+    };
+
+    window.addEventListener("postCreated", handlePostCreated);
+    return () => {
+      window.removeEventListener("postCreated", handlePostCreated);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // 무한 스크롤을 위한 Intersection Observer
+  useEffect(() => {
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting && hasMore && !isLoadingMore && !loading) {
+          loadMorePosts();
+        }
+      },
+      { threshold: 0.1 }
+    );
+
+    const currentTarget = observerTarget.current;
+    if (currentTarget) {
+      observer.observe(currentTarget);
+    }
+
+    return () => {
+      if (currentTarget) {
+        observer.unobserve(currentTarget);
+      }
+    };
+  }, [hasMore, isLoadingMore, loading]);
+
+  const fetchPosts = async (targetPage: number, isInitial = false) => {
     try {
-      setLoading(true);
+      if (isInitial) {
+        setLoading(true);
+      } else {
+        setIsLoadingMore(true);
+      }
       setError(null);
 
-      const response = await fetch(`/api/posts?page=${page}&limit=10`);
+      const response = await fetch(`/api/posts?page=${targetPage}&limit=10`);
       
       if (!response.ok) {
         // API에서 반환한 실제 오류 메시지 가져오기
@@ -83,7 +126,13 @@ export default function PostFeed() {
       }
 
       const data: PostsResponse = await response.json();
-      setPosts(data.posts);
+      
+      if (isInitial) {
+        setPosts(data.posts);
+      } else {
+        setPosts((prev) => [...prev, ...data.posts]);
+      }
+      
       setHasMore(data.hasMore);
       setPage(data.page);
     } catch (err) {
@@ -91,8 +140,16 @@ export default function PostFeed() {
       console.error("Error fetching posts:", err);
     } finally {
       setLoading(false);
+      setIsLoadingMore(false);
     }
   };
+
+  const loadMorePosts = useCallback(() => {
+    if (!isLoadingMore && hasMore) {
+      fetchPosts(page + 1, false);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [page, hasMore, isLoadingMore]);
 
   if (loading) {
     return (
@@ -133,6 +190,20 @@ export default function PostFeed() {
       {posts.map((post) => (
         <PostCard key={post.id} post={post} />
       ))}
+      
+      {/* 무한 스크롤 감지용 요소 */}
+      {hasMore && (
+        <div ref={observerTarget} className="h-4" />
+      )}
+      
+      {/* 추가 로딩 중 표시 */}
+      {isLoadingMore && (
+        <div className="space-y-4">
+          {[...Array(2)].map((_, i) => (
+            <PostCardSkeleton key={`loading-${i}`} />
+          ))}
+        </div>
+      )}
     </div>
   );
 }

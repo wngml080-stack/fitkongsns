@@ -209,3 +209,141 @@ CREATE TRIGGER set_updated_at_comments
     BEFORE UPDATE ON public.comments
     FOR EACH ROW
     EXECUTE FUNCTION public.handle_updated_at();
+
+-- ============================================
+-- 8. 샘플 데이터 추가 (개발/테스트용)
+-- ============================================
+-- 주의: Clerk 인증을 사용하므로 clerk_id는 실제 Clerk 사용자 ID 형식이어야 합니다.
+-- 샘플 데이터용으로는 임의의 clerk_id를 사용할 수 있습니다.
+
+-- 1. 샘플 사용자 추가
+INSERT INTO public.users (clerk_id, name, created_at)
+VALUES
+  ('user_sample_001', '홍길동', now() - INTERVAL '5 days'),
+  ('user_sample_002', '김철수', now() - INTERVAL '3 days'),
+  ('user_sample_003', '이영희', now() - INTERVAL '2 days'),
+  ('user_sample_004', '박민수', now() - INTERVAL '1 day')
+ON CONFLICT (clerk_id) DO NOTHING;
+
+-- 2. 샘플 게시물 추가
+-- 주의: image_url은 실제 이미지 URL이어야 합니다.
+-- 옵션 1: Supabase Storage에 업로드한 이미지 URL 사용
+-- 옵션 2: 외부 이미지 URL 사용 (예: Unsplash, Placeholder 등)
+DO $$
+DECLARE
+  user1_id UUID;
+  user2_id UUID;
+  user3_id UUID;
+  user4_id UUID;
+BEGIN
+  -- 사용자 ID 조회
+  SELECT id INTO user1_id FROM public.users WHERE clerk_id = 'user_sample_001' LIMIT 1;
+  SELECT id INTO user2_id FROM public.users WHERE clerk_id = 'user_sample_002' LIMIT 1;
+  SELECT id INTO user3_id FROM public.users WHERE clerk_id = 'user_sample_003' LIMIT 1;
+  SELECT id INTO user4_id FROM public.users WHERE clerk_id = 'user_sample_004' LIMIT 1;
+
+  -- 샘플 게시물 추가
+  INSERT INTO public.posts (user_id, image_url, caption, created_at)
+  VALUES
+    -- 홍길동의 게시물
+    (user1_id, 'https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=800', '오늘 날씨가 정말 좋네요! 🌞', now() - INTERVAL '4 days'),
+    (user1_id, 'https://images.unsplash.com/photo-1519681393784-d120267933ba?w=800', '산책하면서 찍은 사진입니다.', now() - INTERVAL '2 days'),
+    
+    -- 김철수의 게시물
+    (user2_id, 'https://images.unsplash.com/photo-1518837695005-2083093ee35b?w=800', '맛있는 커피 한 잔 ☕', now() - INTERVAL '3 days'),
+    (user2_id, 'https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=800', '주말에 나들이 다녀왔어요!', now() - INTERVAL '1 day'),
+    
+    -- 이영희의 게시물
+    (user3_id, 'https://images.unsplash.com/photo-1519681393784-d120267933ba?w=800', '새로운 책을 읽기 시작했어요 📚', now() - INTERVAL '2 days'),
+    
+    -- 박민수의 게시물
+    (user4_id, 'https://images.unsplash.com/photo-1518837695005-2083093ee35b?w=800', '오늘의 점심 메뉴 🍱', now() - INTERVAL '6 hours')
+  ON CONFLICT DO NOTHING;
+END $$;
+
+-- 3. 샘플 좋아요 추가
+DO $$
+DECLARE
+  user1_id UUID;
+  user2_id UUID;
+  user3_id UUID;
+  user4_id UUID;
+  post1_id UUID;
+  post2_id UUID;
+  post3_id UUID;
+  post4_id UUID;
+  post5_id UUID;
+  post6_id UUID;
+BEGIN
+  -- 사용자 ID 조회
+  SELECT id INTO user1_id FROM public.users WHERE clerk_id = 'user_sample_001' LIMIT 1;
+  SELECT id INTO user2_id FROM public.users WHERE clerk_id = 'user_sample_002' LIMIT 1;
+  SELECT id INTO user3_id FROM public.users WHERE clerk_id = 'user_sample_003' LIMIT 1;
+  SELECT id INTO user4_id FROM public.users WHERE clerk_id = 'user_sample_004' LIMIT 1;
+
+  -- 게시물 ID 조회 (created_at 기준으로 가져오기)
+  SELECT id INTO post1_id FROM public.posts ORDER BY created_at DESC LIMIT 1 OFFSET 5;
+  SELECT id INTO post2_id FROM public.posts ORDER BY created_at DESC LIMIT 1 OFFSET 4;
+  SELECT id INTO post3_id FROM public.posts ORDER BY created_at DESC LIMIT 1 OFFSET 3;
+  SELECT id INTO post4_id FROM public.posts ORDER BY created_at DESC LIMIT 1 OFFSET 2;
+  SELECT id INTO post5_id FROM public.posts ORDER BY created_at DESC LIMIT 1 OFFSET 1;
+  SELECT id INTO post6_id FROM public.posts ORDER BY created_at DESC LIMIT 1 OFFSET 0;
+
+  -- 좋아요 추가
+  INSERT INTO public.likes (post_id, user_id, created_at)
+  VALUES
+    (post1_id, user2_id, now() - INTERVAL '3 days'),
+    (post1_id, user3_id, now() - INTERVAL '2 days'),
+    (post2_id, user1_id, now() - INTERVAL '1 day'),
+    (post2_id, user3_id, now() - INTERVAL '1 day'),
+    (post3_id, user1_id, now() - INTERVAL '2 days'),
+    (post3_id, user4_id, now() - INTERVAL '1 day'),
+    (post4_id, user1_id, now() - INTERVAL '12 hours'),
+    (post5_id, user2_id, now() - INTERVAL '1 day'),
+    (post6_id, user1_id, now() - INTERVAL '5 hours'),
+    (post6_id, user2_id, now() - INTERVAL '4 hours'),
+    (post6_id, user3_id, now() - INTERVAL '3 hours')
+  ON CONFLICT (post_id, user_id) DO NOTHING;
+END $$;
+
+-- 4. 샘플 댓글 추가
+DO $$
+DECLARE
+  user1_id UUID;
+  user2_id UUID;
+  user3_id UUID;
+  user4_id UUID;
+  post1_id UUID;
+  post2_id UUID;
+  post3_id UUID;
+  post4_id UUID;
+  post5_id UUID;
+  post6_id UUID;
+BEGIN
+  -- 사용자 ID 조회
+  SELECT id INTO user1_id FROM public.users WHERE clerk_id = 'user_sample_001' LIMIT 1;
+  SELECT id INTO user2_id FROM public.users WHERE clerk_id = 'user_sample_002' LIMIT 1;
+  SELECT id INTO user3_id FROM public.users WHERE clerk_id = 'user_sample_003' LIMIT 1;
+  SELECT id INTO user4_id FROM public.users WHERE clerk_id = 'user_sample_004' LIMIT 1;
+
+  -- 게시물 ID 조회
+  SELECT id INTO post1_id FROM public.posts ORDER BY created_at DESC LIMIT 1 OFFSET 5;
+  SELECT id INTO post2_id FROM public.posts ORDER BY created_at DESC LIMIT 1 OFFSET 4;
+  SELECT id INTO post3_id FROM public.posts ORDER BY created_at DESC LIMIT 1 OFFSET 3;
+  SELECT id INTO post4_id FROM public.posts ORDER BY created_at DESC LIMIT 1 OFFSET 2;
+  SELECT id INTO post5_id FROM public.posts ORDER BY created_at DESC LIMIT 1 OFFSET 1;
+  SELECT id INTO post6_id FROM public.posts ORDER BY created_at DESC LIMIT 1 OFFSET 0;
+
+  -- 댓글 추가
+  INSERT INTO public.comments (post_id, user_id, content, created_at)
+  VALUES
+    (post1_id, user2_id, '정말 멋진 사진이네요!', now() - INTERVAL '3 days'),
+    (post1_id, user3_id, '저도 가고 싶어요 😊', now() - INTERVAL '2 days'),
+    (post2_id, user1_id, '좋아요!', now() - INTERVAL '1 day'),
+    (post3_id, user4_id, '맛있어 보여요!', now() - INTERVAL '1 day'),
+    (post4_id, user1_id, '주말 잘 보내셨나요?', now() - INTERVAL '12 hours'),
+    (post5_id, user2_id, '무슨 책이에요?', now() - INTERVAL '1 day'),
+    (post6_id, user1_id, '배고파요 😋', now() - INTERVAL '5 hours'),
+    (post6_id, user3_id, '저도 먹고 싶어요!', now() - INTERVAL '4 hours')
+  ON CONFLICT DO NOTHING;
+END $$;

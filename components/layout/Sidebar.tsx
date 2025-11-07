@@ -5,7 +5,9 @@ import { usePathname } from "next/navigation";
 import { Home, Search, Plus, Heart, User } from "lucide-react";
 import { SignedIn, SignedOut, SignInButton, UserButton, useAuth } from "@clerk/nextjs";
 import { useUser } from "@clerk/nextjs";
+import { useState } from "react";
 import ThemeToggle from "@/components/theme-toggle";
+import CreatePostModal from "@/components/post/CreatePostModal";
 
 /**
  * @file Sidebar.tsx
@@ -42,6 +44,7 @@ export default function Sidebar() {
   const pathname = usePathname();
   const { user } = useUser();
   const { isSignedIn } = useAuth();
+  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
 
   const isActive = (href: string) => {
     if (href === "/") {
@@ -78,6 +81,57 @@ export default function Sidebar() {
             const Icon = item.icon;
             const href = item.href === "/profile" ? getProfileHref() : item.href;
             const active = isActive(href);
+
+            // "만들기" 버튼은 모달 트리거로 처리
+            if (item.href === "/create") {
+              if (!isSignedIn) {
+                return (
+                  <SignInButton key={item.href} mode="modal">
+                    <button
+                      className={`
+                        flex items-center gap-4 px-3 py-2 rounded-lg transition-colors w-full text-left
+                        ${
+                          active
+                            ? "font-semibold text-[var(--instagram-text-primary)] dark:text-[var(--foreground)]"
+                            : "text-[var(--instagram-text-primary)] dark:text-[var(--foreground)] hover:bg-gray-50 dark:hover:bg-gray-800"
+                        }
+                      `}
+                    >
+                      <Icon
+                        className={`w-6 h-6 ${
+                          active ? "stroke-[2.5]" : "stroke-2"
+                        }`}
+                      />
+                      <span className="md:hidden lg:inline text-base">
+                        {item.label}
+                      </span>
+                    </button>
+                  </SignInButton>
+                );
+              }
+
+              return (
+                <button
+                  key={item.href}
+                  onClick={() => setIsCreateModalOpen(true)}
+                  className={`
+                    flex items-center gap-4 px-3 py-2 rounded-lg transition-colors w-full text-left
+                    ${
+                      active
+                        ? "font-semibold text-[var(--instagram-text-primary)] dark:text-[var(--foreground)]"
+                        : "text-[var(--instagram-text-primary)] dark:text-[var(--foreground)] hover:bg-gray-50 dark:hover:bg-gray-800"
+                    }
+                  `}
+                >
+                  <Icon
+                    className={`w-6 h-6 ${active ? "stroke-[2.5]" : "stroke-2"}`}
+                  />
+                  <span className="md:hidden lg:inline text-base">
+                    {item.label}
+                  </span>
+                </button>
+              );
+            }
 
             // 인증이 필요한 메뉴는 로그인하지 않은 경우 SignInButton으로 감싸기
             if (item.requiresAuth && !isSignedIn) {
@@ -161,6 +215,12 @@ export default function Sidebar() {
           </SignedOut>
         </div>
       </div>
+
+      {/* 게시물 작성 모달 */}
+      <CreatePostModal
+        open={isCreateModalOpen}
+        onOpenChange={setIsCreateModalOpen}
+      />
     </aside>
   );
 }

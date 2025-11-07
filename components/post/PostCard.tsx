@@ -8,6 +8,7 @@ import { useState, useEffect, useRef } from "react";
 import { useAuth } from "@clerk/nextjs";
 import { useClerkSupabaseClient } from "@/lib/supabase/clerk-client";
 import { SignInButton } from "@clerk/nextjs";
+import CommentForm from "@/components/comment/CommentForm";
 
 /**
  * @file PostCard.tsx
@@ -29,6 +30,7 @@ interface Comment {
   id: string;
   content: string;
   created_at: string;
+  user_id?: string; // 삭제 버튼 표시를 위해 추가
   user: {
     id: string;
     name: string;
@@ -68,6 +70,8 @@ export default function PostCard({ post }: PostCardProps) {
   const [isAnimating, setIsAnimating] = useState(false);
   const [showDoubleTapHeart, setShowDoubleTapHeart] = useState(false);
   const [isToggling, setIsToggling] = useState(false);
+  const [comments, setComments] = useState<Comment[]>(post.comments);
+  const [commentsCount, setCommentsCount] = useState(post.comments_count);
   const lastTapRef = useRef<number>(0);
   const imageRef = useRef<HTMLDivElement>(null);
 
@@ -174,6 +178,111 @@ export default function PostCard({ post }: PostCardProps) {
       lastTapRef.current = 0;
     } else {
       lastTapRef.current = now;
+    }
+  };
+
+  // 현재 사용자의 Supabase user_id 가져오기
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+
+  useEffect(() => {
+    const fetchCurrentUserId = async () => {
+      if (!isSignedIn || !userId) {
+        setCurrentUserId(null);
+        return;
+      }
+
+      try {
+        const { data: userData } = await supabase
+          .from("users")
+          .select("id")
+          .eq("clerk_id", userId)
+          .single();
+
+        setCurrentUserId(userData?.id || null);
+      } catch (error) {
+        console.error("Error fetching current user ID:", error);
+        setCurrentUserId(null);
+      }
+    };
+
+    fetchCurrentUserId();
+  }, [isSignedIn, userId, supabase]);
+
+  // 댓글 삭제 핸들러
+  const handleDeleteComment = async (commentId: string) => {
+    if (!confirm("댓글을 삭제하시겠습니까?")) {
+      return;
+    }
+
+    try {
+      const response = await fetch(`/api/comments/${commentId}`, {
+        method: "DELETE",
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || "댓글 삭제에 실패했습니다.");
+      }
+
+      // 댓글 목록 새로고침
+      await refreshComments();
+    } catch (error) {
+      console.error("Error deleting comment:", error);
+      alert(error instanceof Error ? error.message : "댓글 삭제에 실패했습니다.");
+    }
+  };
+
+  // 댓글 목록 새로고침
+  const refreshComments = async () => {
+    try {
+      // 게시물의 댓글 최신 2개 가져오기
+      const { data: commentsData, error: commentsError } = await supabase
+        .from("comments")
+        .select("id, content, created_at, user_id")
+        .eq("post_id", post.id)
+        .order("created_at", { ascending: false })
+        .limit(2);
+
+      if (commentsError) {
+        console.error("Error fetching comments:", commentsError);
+        return;
+      }
+
+      // 댓글 작성자 정보 가져오기
+      const commentUserIds = [
+        ...new Set((commentsData || []).map((c: any) => c.user_id)),
+      ];
+      const { data: commentUsersData } = await supabase
+        .from("users")
+        .select("id, name")
+        .in("id", commentUserIds);
+
+      // 댓글과 사용자 정보 조합
+      const commentsWithUsers = (commentsData || []).map((comment: any) => {
+        const user = commentUsersData?.find((u) => u.id === comment.user_id);
+        return {
+          id: comment.id,
+          content: comment.content,
+          created_at: comment.created_at,
+          user_id: comment.user_id, // 삭제 버튼 표시를 위해 추가
+          user: {
+            id: user?.id || comment.user_id,
+            name: user?.name || "Unknown",
+          },
+        };
+      });
+
+      setComments(commentsWithUsers);
+
+      // 댓글 수 업데이트
+      const { count } = await supabase
+        .from("comments")
+        .select("*", { count: "exact", head: true })
+        .eq("post_id", post.id);
+
+      setCommentsCount(count || 0);
+    } catch (error) {
+      console.error("Error refreshing comments:", error);
     }
   };
 
@@ -332,27 +441,47 @@ export default function PostCard({ post }: PostCardProps) {
         )}
 
         {/* 댓글 미리보기 */}
-        {post.comments_count > 0 && (
+        {commentsCount > 0 && (
           <div className="space-y-1">
-            {post.comments_count > 2 && (
+            {commentsCount > 2 && (
               <button className="text-sm text-[var(--instagram-text-secondary)] dark:text-[var(--muted-foreground)] hover:text-[var(--instagram-text-primary)] dark:hover:text-[var(--foreground)]">
-                댓글 {post.comments_count}개 모두 보기
+                댓글 {commentsCount}개 모두 보기
               </button>
             )}
-            {post.comments.slice(0, 2).map((comment) => (
-              <div key={comment.id} className="text-sm text-[var(--instagram-text-primary)] dark:text-[var(--foreground)]">
-                <Link
-                  href={`/profile/${comment.user.id}`}
-                  className="font-semibold hover:opacity-70 mr-2"
+            {comments.slice(0, 2).map((comment) => {
+              const isOwnComment = currentUserId && comment.user_id === currentUserId;
+              return (
+                <div
+                  key={comment.id}
+                  className="flex items-start justify-between gap-2 group"
                 >
-                  {comment.user.name}
-                </Link>
-                <span>{comment.content}</span>
-              </div>
-            ))}
+                  <div className="flex-1 text-sm text-[var(--instagram-text-primary)] dark:text-[var(--foreground)]">
+                    <Link
+                      href={`/profile/${comment.user.id}`}
+                      className="font-semibold hover:opacity-70 mr-2"
+                    >
+                      {comment.user.name}
+                    </Link>
+                    <span>{comment.content}</span>
+                  </div>
+                  {isOwnComment && (
+                    <button
+                      onClick={() => handleDeleteComment(comment.id)}
+                      className="opacity-0 group-hover:opacity-100 transition-opacity text-[var(--instagram-text-secondary)] dark:text-[var(--muted-foreground)] hover:text-[var(--instagram-like)]"
+                      aria-label="댓글 삭제"
+                    >
+                      <MoreHorizontal className="w-4 h-4" />
+                    </button>
+                  )}
+                </div>
+              );
+            })}
           </div>
         )}
       </div>
+
+      {/* 댓글 작성 폼 */}
+      <CommentForm postId={post.id} onSuccess={refreshComments} />
     </article>
   );
 }
