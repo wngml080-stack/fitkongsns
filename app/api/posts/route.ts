@@ -697,11 +697,14 @@ export async function POST(request: NextRequest) {
 
     // Clerk user_id로 Supabase users 테이블에서 user_id 조회
     console.log("[POST /api/posts] Looking up user for clerk_id:", userId);
-    let { data: userData, error: userError } = await supabase
+    const userResult = await supabase
       .from("users")
       .select("id")
       .eq("clerk_id", userId)
       .single();
+
+    let userData = userResult.data;
+    const userError = userResult.error;
 
     if (userError || !userData) {
       console.error("[POST /api/posts] Error fetching user:", {
