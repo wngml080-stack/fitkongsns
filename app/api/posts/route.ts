@@ -98,7 +98,6 @@ export async function GET(request: NextRequest) {
     // post_stats 뷰에서 게시물 목록 가져오기 (시간 역순)
     // 뷰가 없을 경우를 대비해 posts 테이블을 직접 조회
     let postsData: any[] | null = null;
-    let postsError: any = null;
     let totalCount: number | null = null;
 
     if (normalizedHashtag) {
@@ -698,7 +697,7 @@ export async function POST(request: NextRequest) {
 
     // Clerk user_id로 Supabase users 테이블에서 user_id 조회
     console.log("[POST /api/posts] Looking up user for clerk_id:", userId);
-    let { data: userData, error: userError } = await supabase
+    const { data: userData, error: userError } = await supabase
       .from("users")
       .select("id")
       .eq("clerk_id", userId)

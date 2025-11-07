@@ -368,7 +368,7 @@ export default function EditProfileModal({
               placeholder="https://example.com"
             />
             <p className="text-xs text-[var(--instagram-text-secondary)] dark:text-[var(--muted-foreground)]">
-              웹사이트 주소는 "https://"를 포함해야 합니다. (없으면 자동으로 추가됩니다)
+              웹사이트 주소는 &quot;https://&quot;를 포함해야 합니다. (없으면 자동으로 추가됩니다)
             </p>
           </div>
 

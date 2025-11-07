@@ -40,7 +40,6 @@ export async function GET(
 
     // post_stats 뷰에서 게시물 정보 가져오기
     let postData: any = null;
-    let postError: any = null;
 
     // 먼저 post_stats 뷰를 시도
     const viewResult = await supabase
